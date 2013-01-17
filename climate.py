@@ -15,9 +15,19 @@ timer = []
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 NUM_MONTHS = len(MONTHS)
 
-ROWS = ['record high', 'high', 'mean', 'low', 'record low']
-# TODO: add support for precipitation in/mm/days, sunshine hours, etc
+ROWS = ['record high', 'high', 'mean', 'low', 'record low', 'sun', 
+	'precipitation days', 'precipitation mm',
+	'rain days', 'rain mm', 'snow days', 'snow cm']
+# TODO: add support for other data of interest
 
+PRINTED_ROW_TITLES = {'record high': 'r-high', 'high': 'high', 'mean': 'mean',
+	'low': 'low', 'record low': 'r-low', 'sun': 'sun',
+	'precipitation days': 'prep days', 'precipitation mm': 'prep mm',
+	'rain days': 'rain days', 'rain mm': 'rain mm',
+	'snow days': 'snow days', 'snow cm': 'snow cm'}
+
+ROWS_TO_PRINT = ['record high', 'high', 'low', 'record low', 'sun']
+	
 API_URL = 'http://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&redirects=true&rvprop=content&format=json'
 
 def get_URL(url):
@@ -67,13 +77,6 @@ def get_city():
 
 	return city
 
-def parse(string):
-	string = string.strip().replace(u'−', '-')
-	return float(string)
-
-def FtoC(f):
-	return round((f - 32)*(5.0/9.0), 1)
-
 def get_climate_data(place):
 	result = {}
 	for row_name in ROWS:
@@ -89,6 +92,14 @@ def get_climate_data(place):
 			return data[index1:index2]
 		else:
 			return ''
+
+	def parse(string):
+		string = string.strip().replace(u'−', '-')
+		return float(string)
+
+	def FtoC(f):
+		return round((f - 32)*(5.0/9.0), 1)
+
 
 	result['place'],data = get_page_source(place)
 
@@ -111,26 +122,30 @@ def get_climate_data(place):
 		line = line.strip()
 		month = line[:3]
 		if month in MONTHS:
-			celsius = line.find(' C', 4)
-			fahrenheit = line.find(' F', 4)
-			
-			# TODO: this parsing will need to be expanded to support
-			# mm, in, days/hours/percent, etc, as needed for ROWS
-			if celsius > -1:
-				category = line[4:celsius]
-				if category in result:
-					value = parse(line[line.find('=')+1:]) 
-					result[category].append(value)
-			elif fahrenheit > -1:
-				category = line[4:fahrenheit]
-				if category in result:
-					value = parse(line[line.find('=')+1:])
-					value = FtoC(value)
-					result[category].append(value)
+			category,value = (x.strip() for x in line.split('='))
+			category = category[4:] # take out the month
 
+			if category in result:
+				# straightforward putting the data in
+				value = parse(value)
+				result[category].append(value)
+			elif category[-2:] == ' C' and category[:-2] in result:
+				value = parse(value)
+				result[category[:-2]].append(value)
+			elif category[-2:] == ' F' and category[:-2] in result:
+				value = FtoC(parse(value))
+				result[category[:-2]].append(value)
+
+			# TODO: add in support for other data 
+			# using mm, in, etc as needed
+		
 	return result
 
 def print_data_as_text(provided_data):
+	row_titles = dict((row,PRINTED_ROW_TITLES[row]) 
+		for row in PRINTED_ROW_TITLES if row in ROWS_TO_PRINT)
+	max_row_title = 0
+
 	data = provided_data
 	max_lengths = [0]*NUM_MONTHS
 
@@ -140,13 +155,18 @@ def print_data_as_text(provided_data):
 				data[category][i] = str(data[category][i])
 				max_lengths[i] = max(max_lengths[i], len(data[category][i]))
 
-	def print_one_row(row):
-		return '|' + '|'.join(row[i].rjust(max_lengths[i]) for i in range(NUM_MONTHS)) + '|'
+			if category in row_titles:
+				max_row_title = max(max_row_title, len(row_titles[category]))
+
+	def print_one_row(row, title):
+		result = row_titles[title].rjust(max_row_title) + '|'
+		result = result + '|'.join(row[i].rjust(max_lengths[i]) for i in range(NUM_MONTHS)) + '|'
+		return result
 	
 	result = []
 	for row_name in ROWS:
-		if row_name in data and len(data[row_name]) == NUM_MONTHS:
-			result.append(print_one_row(data[row_name]))
+		if row_name in row_titles and row_name in data and len(data[row_name]) == NUM_MONTHS:
+			result.append(print_one_row(data[row_name], row_name))
 
 	if len(result) > 0:
 		print data['place']
