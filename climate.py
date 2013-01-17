@@ -9,6 +9,7 @@ import pycurl
 import StringIO
 import simplejson as json
 import time
+import calendar
 
 timer = []
 
@@ -97,8 +98,18 @@ def get_climate_data(place):
 		string = string.strip().replace(u'−', '-')
 		return float(string)
 
-	def FtoC(f):
+	def F_to_C(f):
 		return round((f - 32)*(5.0/9.0), 1)
+
+	def daily_to_monthly(daily, month):
+		# convert text month to number
+		month = MONTHS.index(month) + 1
+
+		# use a non-leap year since I suspect monthly numbers are given
+		# for non-leap Februarys
+		days = calendar.monthrange(2013, month)[1]
+
+		return daily * days
 
 
 	result['place'],data = get_page_source(place)
@@ -123,7 +134,7 @@ def get_climate_data(place):
 		month = line[:3]
 		if month in MONTHS:
 			category,value = (x.strip() for x in line.split('='))
-			category = category[4:] # take out the month
+			category = category[3:].strip() # take out the month
 
 			if category in result:
 				# straightforward putting the data in
@@ -133,8 +144,11 @@ def get_climate_data(place):
 				value = parse(value)
 				result[category[:-2]].append(value)
 			elif category[-2:] == ' F' and category[:-2] in result:
-				value = FtoC(parse(value))
+				value = F_to_C(parse(value))
 				result[category[:-2]].append(value)
+			elif category == 'd sun':
+				value = daily_to_monthly(parse(value), month)
+				result['sun'].append(value)
 
 			# TODO: add in support for other data 
 			# using mm, in, etc as needed
