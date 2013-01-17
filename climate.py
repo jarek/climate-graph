@@ -15,6 +15,7 @@ MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 
 NUM_MONTHS = len(MONTHS)
 
 ROWS = ['record high', 'high', 'mean', 'low', 'record low']
+# TODO: add support for precipitation in/mm/days, sunshine hours, etc
 
 API_URL = 'http://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&redirects=true&rvprop=content&format=json'
 
@@ -46,18 +47,18 @@ def get_city():
 	arguments = cgi.FieldStorage()
 
 	if 'city' in arguments:
-		city = str(arguments['city'].value).lower()
+		city = str(arguments['city'].value).title()
 	elif len(sys.argv) > 1:
-		city = sys.argv[1].lower()
+		city = sys.argv[1].title()
 
 	return city
 
 def parse(string):
-	string = string.replace(u'−', '-')
+	string = string.strip().replace(u'−', '-')
 	return float(string)
 
 def FtoC(f):
-	return round((f - 32)*(5.0/9.0), 2)
+	return round((f - 32)*(5.0/9.0), 1)
 
 def get_climate_data(place):
 	result = {}
@@ -82,12 +83,22 @@ def get_climate_data(place):
 	for line in infobox_items:
 		month = line[:3]
 		if month in MONTHS:
-			category = line[4:line.find(' C')] # TODO: expand to F, mm
-			if category in result:
-				value = parse(line[line.find('=')+1:]) 
-				# note: this will break when there's not exactly one space between = and value
-				# need to make this more robust ;)
-				result[category].append(value)
+			celsius = line.find(' C', 4)
+			fahrenheit = line.find(' F', 4)
+			
+			# TODO: this parsing will need to be expanded to support
+			# mm, in, days/hours/percent, etc, as needed for ROWS
+			if celsius > -1:
+				category = line[4:celsius]
+				if category in result:
+					value = parse(line[line.find('=')+1:]) 
+					result[category].append(value)
+			elif fahrenheit > -1:
+				category = line[4:fahrenheit]
+				if category in result:
+					value = parse(line[line.find('=')+1:])
+					value = FtoC(value)
+					result[category].append(value)
 
 	return result
 
