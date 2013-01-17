@@ -4,6 +4,7 @@
 import cgi
 import os
 import sys
+import urllib
 import pycurl
 import StringIO
 import simplejson as json
@@ -37,6 +38,19 @@ def get_URL(url):
 	
 	return html
 
+def get_page_source(page):
+	url = API_URL % urllib.quote_plus(page)
+	text = get_URL(url)
+	data = json.loads(text)
+
+	# TODO: gracefully handle errors here
+	page = data['query']['pages'].itervalues().next()
+
+	page_title = page['title']
+	page_text = page['revisions'][0]['*']
+	
+	return page_title,page_text
+
 def get_city():
 	city = 'Melbourne'
 
@@ -47,9 +61,9 @@ def get_city():
 	arguments = cgi.FieldStorage()
 
 	if 'city' in arguments:
-		city = str(arguments['city'].value).title()
+		city = str(arguments['city'].value).capitalize()
 	elif len(sys.argv) > 1:
-		city = sys.argv[1].title()
+		city = sys.argv[1].capitalize()
 
 	return city
 
@@ -65,22 +79,36 @@ def get_climate_data(place):
 	for row_name in ROWS:
 		result[row_name] = []
 
-	text = get_URL(API_URL % place)
-	data = json.loads(text)
+	def find_weatherbox_template(data):
+		index1 = data.find('{{Weather box')
+		# TODO: this actually catches end of any first template. could be cite template 
+		# or something else. add code to count {{ and }} to find the right one
+		index2 = data.find('}}', index1)
 
-	# TODO: gracefully handle errors here
-	result['place'] = data['query']['pages'].itervalues().next()['title']
+		if index1 > -1 and index2 > -1:
+			return data[index1:index2]
+		else:
+			return ''
 
-	data = data['query']['pages'].itervalues().next()['revisions'][0]['*']
-	# TODO: some pages have a separate custom template like {{Toronto weatherbox}}
-	index1 = data.find('{{Weather box')
-	# TODO: this actually catches end of any first template. could be cite template 
-	# or something else. add code to count {{ and }} to find the right one
-	index2 = data.find('}}', index1)
-	
-	infobox_items = data[index1:index2].split('|')
+	result['place'],data = get_page_source(place)
 
-	for line in infobox_items:
+	weatherbox = find_weatherbox_template(data).strip()
+
+	if len(weatherbox) == 0:
+		index2 = data.find('weatherbox}}')
+		index1 = data.rfind('{{', 0, index2)
+
+		if index1 > -1 and index2 > -1:
+			# there's a weather box template we can look at
+			template_name = 'Template:' + data[index1+2:index2+10]
+
+			weatherbox_title,data = get_page_source(template_name)
+			weatherbox = find_weatherbox_template(data)
+
+	weatherbox_items = weatherbox.split('|')
+
+	for line in weatherbox_items:
+		line = line.strip()
 		month = line[:3]
 		if month in MONTHS:
 			celsius = line.find(' C', 4)
@@ -112,14 +140,19 @@ def print_data_as_text(provided_data):
 				data[category][i] = str(data[category][i])
 				max_lengths[i] = max(max_lengths[i], len(data[category][i]))
 
-	print data['place']
-
 	def print_one_row(row):
-		print '|' + '|'.join(row[i].rjust(max_lengths[i]) for i in range(NUM_MONTHS)) + '|'
+		return '|' + '|'.join(row[i].rjust(max_lengths[i]) for i in range(NUM_MONTHS)) + '|'
 	
+	result = []
 	for row_name in ROWS:
 		if row_name in data and len(data[row_name]) == NUM_MONTHS:
-			print_one_row(data[row_name])
+			result.append(print_one_row(data[row_name]))
+
+	if len(result) > 0:
+		print data['place']
+		print '\n'.join(result)
+	else:
+		print data['place'] + ': no information found'
 
 
 if __name__ == '__main__':
