@@ -157,7 +157,7 @@ def get_climate_data(place):
 		
 	return result
 
-def print_data_as_text(provided_data):
+def format_data_as_text(provided_data):
 	row_titles = dict((row,PRINTED_ROW_TITLES[row]) 
 		for row in PRINTED_ROW_TITLES if row in ROWS_TO_PRINT)
 	max_row_title = 0
@@ -185,10 +185,12 @@ def print_data_as_text(provided_data):
 			result.append(print_one_row(data[row_name], row_name))
 
 	if len(result) > 0:
-		print data['place']
-		print '\n'.join(result)
+		output = data['place'] + '\n'
+		output = output + '\n'.join(result)
 	else:
-		print data['place'] + ': no information found'
+		output = data['place'] + ': no information found'
+
+	return output
 
 
 if __name__ == '__main__':
@@ -196,5 +198,5 @@ if __name__ == '__main__':
 	
 	for city in cities:
 		data = get_climate_data(city)
-		print_data_as_text(data)
+		print format_data_as_text(data)
 
