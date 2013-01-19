@@ -62,8 +62,8 @@ def get_page_source(page):
 	
 	return page_title,page_text
 
-def get_city():
-	city = 'Melbourne'
+def get_cities():
+	cities = ['Melbourne']
 
 	# look for http param first
 	# if http param not present, look for command line param
@@ -72,11 +72,13 @@ def get_city():
 	arguments = cgi.FieldStorage()
 
 	if 'city' in arguments:
-		city = str(arguments['city'].value).capitalize()
+		cities = [str(arguments['city'].value)]
+	elif 'cities' in arguments:
+		cities = str(arguments['cities'].value).split(';')
 	elif len(sys.argv) > 1:
-		city = sys.argv[1].capitalize()
+		cities = sys.argv[1:]
 
-	return city
+	return cities
 
 def get_climate_data(place):
 	result = {}
@@ -190,7 +192,9 @@ def print_data_as_text(provided_data):
 
 
 if __name__ == '__main__':
-	city = get_city()
-	data = get_climate_data(city)
-	print_data_as_text(data)
+	cities = get_cities()
+	
+	for city in cities:
+		data = get_climate_data(city)
+		print_data_as_text(data)
 
