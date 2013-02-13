@@ -87,11 +87,29 @@ def get_climate_data(place):
 
 	def find_weatherbox_template(data):
 		index1 = data.find('{{Weather box')
-		# TODO: this actually catches end of any first template. could be cite template 
-		# or something else. add code to count {{ and }} to find the right one
-		index2 = data.find('}}', index1)
 
-		if index1 > -1 and index2 > -1:
+		if index1 > -1:
+			# there's a weather box - find its extent
+
+			index2 = index1
+			loop_end = False
+
+			while not loop_end:
+				# count template open and close tags to grab
+				# full extent of weatherbox template.
+				# avoids incomplete data due to cite or convert
+				# templates.
+				index2 = data.find('}}', index2)+2
+				open_count = data[index1:index2].count('{{') 
+				clos_count = data[index1:index2].count('}}')
+
+				loop_end = open_count == clos_count # do..while
+
+			# TODO: malformed pages with no closing template could
+			# send me into endless loop. add another variable to 
+			# make sure i'm advancing index2 with each iteration,
+			# if it's not changing break
+
 			return data[index1:index2]
 		else:
 			return ''
