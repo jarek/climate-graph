@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+from __future__ import unicode_literals
 import cgi
 import os
 import sys
 import urllib
-import pycurl
+import urllib2
 import StringIO
 import simplejson as json
 import time
@@ -34,23 +35,15 @@ API_URL = 'http://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=
 def get_URL(url):
 	htime1 = time.time()
 
-	c = pycurl.Curl()
-	c.setopt(pycurl.URL, url)
-
-	b = StringIO.StringIO()
-	c.setopt(pycurl.WRITEFUNCTION, b.write)
-	c.perform()
+	html = urllib2.urlopen(url).read()
 
 	htime2 = time.time()
 	timer.append(['http get, ms', (htime2-htime1)*1000.0])
 
-	html = b.getvalue()
-	b.close()
-	
 	return html
 
 def get_page_source(page_name):
-	url = API_URL % urllib.quote_plus(page_name)
+	url = API_URL % urllib.quote_plus(page_name.encode('utf-8'))
 	text = get_URL(url)
 	data = json.loads(text)
 
@@ -66,23 +59,24 @@ def get_page_source(page_name):
 	
 		return page_title,page_text
 	except:
-		return str(page_name) + ': location not found',False
+		return unicode(page_name) + ': location not found',False
 
 def get_cities():
 	cities = []
 
-	# look for http param first
-	# if http param not present, look for command line param
-	
-	param = None
-	arguments = cgi.FieldStorage()
+	# cgi arguments commented out because i have no way of testing them 
+	# right now - don't want anything potentially shaky in live code
+	"""arguments = cgi.FieldStorage()
 
 	if 'city' in arguments:
-		cities = [str(arguments['city'].value)]
+		cities = [unicode(arguments['city'].value)]
 	elif 'cities' in arguments:
-		cities = str(arguments['cities'].value).split(';')
-	elif len(sys.argv) > 1:
+		cities = unicode(arguments['cities'].value).split(';')
+	el"""
+	if len(sys.argv) > 1:
 		cities = sys.argv[1:]
+		
+	cities = [arg.decode('utf-8') for arg in cities]
 
 	return cities
 
