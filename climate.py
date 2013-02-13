@@ -49,21 +49,27 @@ def get_URL(url):
 	
 	return html
 
-def get_page_source(page):
-	url = API_URL % urllib.quote_plus(page)
+def get_page_source(page_name):
+	url = API_URL % urllib.quote_plus(page_name)
 	text = get_URL(url)
 	data = json.loads(text)
 
-	# TODO: gracefully handle errors here
-	page = data['query']['pages'].itervalues().next()
+	try:
+		page = data['query']['pages'].itervalues().next()
+		page_title = page['title']
+	except:
+		return 'unknown error occurred',False
 
-	page_title = page['title']
-	page_text = page['revisions'][0]['*']
+	try:
+		# this line will error for a non-existent page
+		page_text = page['revisions'][0]['*']
 	
-	return page_title,page_text
+		return page_title,page_text
+	except:
+		return str(page_name) + ': location not found',False
 
 def get_cities():
-	cities = ['Melbourne']
+	cities = []
 
 	# look for http param first
 	# if http param not present, look for command line param
@@ -81,11 +87,10 @@ def get_cities():
 	return cities
 
 def get_climate_data(place):
-	result = {}
-	for row_name in ROWS:
-		result[row_name] = []
-
 	def find_weatherbox_template(data):
+		if data is False:
+			return ''
+
 		index1 = data.find('{{Weather box')
 
 		if index1 > -1:
@@ -132,20 +137,37 @@ def get_climate_data(place):
 		return daily * days
 
 
-	result['place'],data = get_page_source(place)
+	result = {'page_error': False}
+	for row_name in ROWS:
+		result[row_name] = []
+
+	result['title'],data = get_page_source(place)
 
 	weatherbox = find_weatherbox_template(data).strip()
 
-	if len(weatherbox) == 0:
-		index2 = data.find('weatherbox}}')
-		index1 = data.rfind('{{', 0, index2)
+	if data is False:
+		# indicates a problem getting data - signal it so output
+		# can be formatted accordingly
+		result['page_error'] = True
+		return result
 
-		if index1 > -1 and index2 > -1:
-			# there's a weather box template we can look at
+	if len(weatherbox) == 0:
+		# weatherbox not found directly on page
+		# see there's a dedicated city weather template we can look at
+		index2 = data.find('weatherbox}}')
+
+		if index2 > -1:
+			index1 = data.rfind('{{', 0, index2)
 			template_name = 'Template:' + data[index1+2:index2+10]
 
+			# there is separate template - get it and process it
 			weatherbox_title,data = get_page_source(template_name)
-			weatherbox = find_weatherbox_template(data)
+			if data is False:
+				result['page_error'] = True
+				result['title'] = weatherbox_title
+				return result
+			else:
+				weatherbox = find_weatherbox_template(data)
 
 	weatherbox_items = weatherbox.split('|')
 
@@ -176,6 +198,10 @@ def get_climate_data(place):
 	return result
 
 def format_data_as_text(provided_data):
+	if provided_data['page_error'] is True:
+		# on page error, only print error message
+		return provided_data['title']
+
 	row_titles = dict((row,PRINTED_ROW_TITLES[row]) 
 		for row in PRINTED_ROW_TITLES if row in ROWS_TO_PRINT)
 	max_row_title = 0
@@ -203,10 +229,10 @@ def format_data_as_text(provided_data):
 			result.append(print_one_row(data[row_name], row_name))
 
 	if len(result) > 0:
-		output = data['place'] + '\n'
+		output = data['title'] + '\n'
 		output = output + '\n'.join(result)
 	else:
-		output = data['place'] + ': no information found'
+		output = data['title'] + ': no information found'
 
 	return output
 
