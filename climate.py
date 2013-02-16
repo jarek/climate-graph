@@ -32,19 +32,19 @@ ROWS_TO_PRINT = ['record high', 'high', 'low', 'record low', 'sun']
 	
 API_URL = 'http://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&redirects=true&rvprop=content&format=json'
 
-def get_URL(url):
+def get_URL(url, description = ''):
 	htime1 = time.time()
 
 	html = urllib2.urlopen(url).read()
 
-	htime2 = time.time()
-	timer.append(['http get, ms', (htime2-htime1)*1000.0])
+	timer.append(['http get ' + description + ', ms',
+		(time.time()-htime1)*1000.0])
 
 	return html
 
 def get_page_source(page_name):
 	url = API_URL % urllib.quote_plus(page_name.encode('utf-8'))
-	text = get_URL(url)
+	text = get_URL(url, page_name)
 	data = json.loads(text)
 
 	try:
@@ -98,20 +98,46 @@ def get_climate_data(place):
 				# full extent of weatherbox template.
 				# avoids incomplete data due to cite or convert
 				# templates.
+				prev_index2 = index2
+
 				index2 = data.find('}}', index2)+2
 				open_count = data[index1:index2].count('{{') 
 				clos_count = data[index1:index2].count('}}')
 
-				loop_end = open_count == clos_count # do..while
+				# to end loop, check for two things:
+				# - open count = close count: we found the 
+				# complete template, can stop looking
+				# - previous index is same as current index:
+				# loop is not advancing, might be a malformed
+				# page, avoid endless loop by breaking
 
-			# TODO: malformed pages with no closing template could
-			# send me into endless loop. add another variable to 
-			# make sure i'm advancing index2 with each iteration,
-			# if it's not changing break
+				loop_end = (open_count == clos_count) and \
+					(index2 != prev_index2) # do..while
 
 			return data[index1:index2]
 		else:
 			return ''
+
+	def find_separate_weatherbox_template(data):
+		if data is False:
+			return ''
+
+		# {{cityname weatherbox}} seems to be the usual template name.
+		# I'll just look for any template ending with weatherbox.
+		# I've not seen a page this breaks on yet.
+		index2 = data.find('weatherbox}}')
+
+		if index2 > -1:
+			# there is separate template - get it and process it
+			index1 = data.rfind('{{', 0, index2)
+			template_name = 'Template:' + data[index1+2:index2+10]
+
+			weatherbox_title,data = get_page_source(template_name)
+			if data is not False:
+				return find_weatherbox_template(data)
+
+		# if we didn't find template, or we couldn't get it, fall back
+		return ''
 
 	def parse(string):
 		string = string.strip().replace(u'−', '-')
@@ -148,20 +174,7 @@ def get_climate_data(place):
 	if len(weatherbox) == 0:
 		# weatherbox not found directly on page
 		# see there's a dedicated city weather template we can look at
-		index2 = data.find('weatherbox}}')
-
-		if index2 > -1:
-			index1 = data.rfind('{{', 0, index2)
-			template_name = 'Template:' + data[index1+2:index2+10]
-
-			# there is separate template - get it and process it
-			weatherbox_title,data = get_page_source(template_name)
-			if data is False:
-				result['page_error'] = True
-				result['title'] = weatherbox_title
-				return result
-			else:
-				weatherbox = find_weatherbox_template(data)
+		weatherbox = find_separate_weatherbox_template(data).strip()
 
 	weatherbox_items = weatherbox.split('|')
 
@@ -230,6 +243,9 @@ def format_data_as_text(provided_data):
 
 	return output
 
+def format_timer_info():
+	return '\n'.join(l[0] + ': ' + str(l[1]) for l in timer)
+
 
 if __name__ == '__main__':
 	cities = get_cities()
@@ -237,4 +253,5 @@ if __name__ == '__main__':
 	for city in cities:
 		data = get_climate_data(city)
 		print format_data_as_text(data)
+		#print format_timer_info()
 
