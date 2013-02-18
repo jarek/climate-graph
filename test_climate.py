@@ -92,6 +92,16 @@ class known_values(unittest.TestCase):
 				'record low': {11: -30}, #december
 				'rain mm': {7: 79.6}, #august
 				'sun': {4: 229.1} #may
+			},
+			# for Sydney, test conversion from daily sun hours, as
+			# specified on wiki page, into monthly hours, as used
+			# elsewhere in the script
+			'Sydney': {
+				'sun': {11: 235.6, 5: 165}, #december, june
+				'record high': {0: 45.8}, #january
+				'record low': {3: 7}, #april
+				'rain days': {5: 12.5},
+				'rain mm': {8: 68.9}
 			}
 		}
 
