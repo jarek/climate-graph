@@ -3,7 +3,13 @@
 
 from __future__ import unicode_literals
 import unittest
+import os
+import time
+from datetime import datetime
+from datetime import timedelta
+
 import climate
+import cache
 
 class known_values(unittest.TestCase):
 	def test_nonexistent_page(self):
@@ -114,6 +120,93 @@ class known_values(unittest.TestCase):
 						actual_data[key][month],
 						expected_value)
 
+class climate_cache_test(unittest.TestCase):
+	def test_cache_create(self):
+		""" Really basic test: get a page, then check if it is 
+		reported as having cache available. """
+
+		climate.get_climate_data('Melbourne')
+		self.assertEqual(cache.exists('Melbourne'), True)
+
+	def test_cache_timing(self):
+		""" Bit of a wonky test: test actual caching by comparing time
+		to load a page uncached and time to load it cached. The latter
+		should be shorter.
+		Might fail with a false negative if filesystem is being slow 
+		at the moment, but in general it should work pretty well. """
+
+		page = 'Melbourne'
+		cache.clear(page)
+
+		time1 = time.time()
+		climate.get_climate_data(page)
+		time_with_no_cache = time.time() - time1
+
+		time2 = time.time()
+		climate.get_climate_data(page)
+		time_with_cache = time.time() - time2
+
+		self.assertTrue(time_with_cache < time_with_no_cache)
+
+	def test_cache_timeout(self):
+		""" Make sure files older than 7 days are treated as not valid
+		for cache purposes. Fake this with changing a file's 
+		modified time with os.utime() """
+
+		page = 'Melbourne'
+
+		climate.get_climate_data(page)
+		self.assertEqual(cache.exists(page), True)
+
+		# cache.get_file_name should really be treated as private
+		# most of the time, but for the purposes of the test 
+		# it's OK to use it I guess
+		file_name = cache.get_file_name(page)
+
+		# set new filetime to (max cache age + 1 day) ago
+		new_file_datetime = datetime.now() - \
+			timedelta(cache.CACHE_PERIOD_DAYS + 1, 0)
+		new_file_timestamp = time.mktime(new_file_datetime.timetuple())
+
+		# use the new timestamp as both access time and modify time
+		os.utime(file_name, (new_file_timestamp, new_file_timestamp))
+
+		# assert it's now reported as not cacheable
+		self.assertEqual(cache.exists(page), False)
+
+	def test_cache_clear(self):
+		""" Test cache clearing by downloading a page (and thus 
+		creating the cached version), then asking for it to be cleared,
+		and checking if the file still exists """
+
+		# download a test page first - make sure it is cached
+		climate.get_climate_data('Melbourne')
+
+		# clear, and see if it reports successful
+		paths = cache.clear('Melbourne')
+		self.assertEqual(cache.exists('Melbourne'), False)
+
+		# check if file physically exists
+		for path in paths:
+			self.assertFalse(os.path.exists(path))
+
+	def test_cache_clear_all(self):
+		""" Test cache clearing by downloading a page (and thus 
+		creating the cached version), then asking for everything 
+		to be cleared, and checking if files reported exist """
+		# download a test page first - make sure it is cached
+		climate.get_climate_data('Melbourne')
+
+		paths = cache.clear_all()
+
+		# see if it self-reports successful for the test page
+		self.assertEquals(cache.exists('Melbourne'), False)
+
+		# check if files physically exists
+		for path in paths:
+			self.assertFalse(os.path.exists(path))
+
 
 if __name__ == '__main__':
 	unittest.main()
+

@@ -3,14 +3,13 @@
 
 from __future__ import unicode_literals
 import cgi
-import os
 import sys
 import urllib
-import urllib2
-import StringIO
 import simplejson as json
 import time
 import calendar
+
+import cache
 
 timer = []
 
@@ -32,19 +31,9 @@ ROWS_TO_PRINT = ['record high', 'high', 'low', 'record low', 'sun']
 	
 API_URL = 'http://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&redirects=true&rvprop=content&format=json'
 
-def get_URL(url, description = ''):
-	htime1 = time.time()
-
-	html = urllib2.urlopen(url).read()
-
-	timer.append(['http get ' + description + ', ms',
-		(time.time()-htime1)*1000.0])
-
-	return html
-
 def get_page_source(page_name):
 	url = API_URL % urllib.quote_plus(page_name.encode('utf-8'))
-	text = get_URL(url, page_name)
+	text = cache.get_URL(url, page_name)
 	data = json.loads(text)
 
 	try:
