@@ -116,7 +116,15 @@ def get_climate_data(place):
 		# {{cityname weatherbox}} seems to be the usual template name.
 		# I'll just look for any template ending with weatherbox.
 		# I've not seen a page this breaks on yet.
-		index2 = data.find('weatherbox}}')
+
+		# New York City includes its weatherbox through a reference 
+		# to {{New York City weatherbox/cached}}, where the /cached 
+		# template contains rendered HTML tables. I want to look at 
+		# "Template:New York City weatherbox" instead. Not sure how 
+		# common this is, but NYC is pretty major and handling it
+		# is easy, so might as well.
+		index2 = max(data.find('weatherbox}}'),
+			data.find('weatherbox/cached}}'))
 
 		if index2 > -1:
 			# there is separate template - get it and process it
