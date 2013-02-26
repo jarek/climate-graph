@@ -13,6 +13,8 @@ import cache
 
 timer = []
 
+# hardcode rather than using calendar.month_abbr to avoid 
+# potential locale problems - wikipedia always uses the English abbrs
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 NUM_MONTHS = len(MONTHS)
 
@@ -224,8 +226,26 @@ def format_data_as_text(provided_data):
 		if row_name in row_titles and row_name in data and len(data[row_name]) == NUM_MONTHS:
 			result.append(print_one_row(data[row_name], row_name))
 
+	# add month indicators to top line
+	# to make finding e.g. September easy
+	month_names = print_one_row(list(month[0] for month in MONTHS), 'low')
+	
+	title_length = len(data['title'])
+	title_min_padding = 8
+
+	title_padding = max(24, title_length + title_min_padding)
+
+	if month_names[title_padding] == '|':
+		# avoid having just a lone |
+		title_padding += 1
+
+	space_length = title_padding - title_length
+
+	month_names = month_names[title_padding:]
+	month_names = (' ' * space_length) + month_names
+
 	if len(result) > 0:
-		output = data['title'] + '\n'
+		output = data['title'] + month_names + '\n'
 		output = output + '\n'.join(result)
 	else:
 		output = data['title'] + ': no information found'
