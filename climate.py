@@ -18,19 +18,32 @@ timer = []
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 NUM_MONTHS = len(MONTHS)
 
-ROWS = ['record high', 'high', 'mean', 'low', 'record low', 'sun', 
+ROWS = ['record high C', 'high C', 'mean C', 'low C', 'record low C', 'sun', 
 	'precipitation days', 'precipitation mm',
 	'rain days', 'rain mm', 'snow days', 'snow cm']
 # TODO: add support for other data of interest
 
-PRINTED_ROW_TITLES = {'record high': 'r-high', 'high': 'high', 'mean': 'mean',
-	'low': 'low', 'record low': 'r-low', 'sun': 'sun',
+PRINTED_ROW_TITLES = {'record high C': 'r-high', 'high C': 'high', 'mean C': 'mean',
+	'low C': 'low', 'record low C': 'r-low', 'sun': 'sun',
 	'precipitation days': 'prep days', 'precipitation mm': 'prep mm',
 	'rain days': 'rain days', 'rain mm': 'rain mm',
 	'snow days': 'snow days', 'snow cm': 'snow cm'}
 
-ROWS_TO_PRINT = ['record high', 'high', 'low', 'record low', 'sun']
-	
+ROWS_TO_PRINT = ['record high C', 'high C', 'low C', 'record low C', 'sun']
+# , 'snow days', 'snow cm', 'precipitation days', 'precipitation mm', 'rain days', 'rain mm']
+
+UNIT_CONVERSIONS = {
+	'F': {
+		'C': (lambda f: round((f - 32)*(5.0/9.0), 1))
+	},
+	'inch': {
+		'mm': (lambda x: round(x*25.4, 1)),
+		'cm': (lambda x: round(x*2.54, 1))
+	},
+	'mm': {	'cm': (lambda x: x*10) },
+	'cm': {	'mm': (lambda x: x/10.0) }
+	}
+
 API_URL = 'http://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&redirects=true&rvprop=content&format=json'
 
 def get_page_source(page_name):
@@ -142,9 +155,6 @@ def get_climate_data(place):
 		string = string.strip().replace(u'−', '-')
 		return float(string)
 
-	def F_to_C(f):
-		return round((f - 32)*(5.0/9.0), 1)
-
 	def daily_to_monthly(daily, month):
 		# convert text month to number
 		month = MONTHS.index(month) + 1
@@ -183,19 +193,30 @@ def get_climate_data(place):
 		if month in MONTHS:
 			category,value = (x.strip() for x in line.split('='))
 			category = category[3:].strip() # take out the month
+			value = parse(value) # parse as number
+
+			# last token of category name is sometimes the unit
+			# (C, F, mm, inch, etc)
+			unit = category.rsplit(None, 1)[-1]
 
 			if category in result:
 				# straightforward putting the data in
-				value = parse(value)
 				result[category].append(value)
-			elif category[-2:] == ' C' and category[:-2] in result:
-				value = parse(value)
-				result[category[:-2]].append(value)
-			elif category[-2:] == ' F' and category[:-2] in result:
-				value = F_to_C(parse(value))
-				result[category[:-2]].append(value)
+
+			elif unit in UNIT_CONVERSIONS:
+				# try to convert units to known ones
+				for target_unit in UNIT_CONVERSIONS[unit]:
+					# try to find a category that 
+					#  how to convert into
+					converted_category = category.replace(unit, target_unit)
+					if converted_category in result:
+						converted = UNIT_CONVERSIONS[unit][target_unit](value)
+						result[converted_category].append(converted)
+						break
+
 			elif category == 'd sun':
-				value = daily_to_monthly(parse(value), month)
+				# special handling for daily sun hours
+				value = daily_to_monthly(value, month)
 				result['sun'].append(value)
 
 			# TODO: add in support for other data 
@@ -234,9 +255,12 @@ def format_data_as_text(provided_data):
 		if row_name in row_titles and row_name in data and len(data[row_name]) == NUM_MONTHS:
 			result.append(print_one_row(data[row_name], row_name))
 
+	# TODO: for categories like prep days, snow cm, etc
+	# (e.g. not temperature), print '0.0' as '-' or empty
+
 	# add month indicators to top line
 	# to make finding e.g. September easy
-	month_names = print_one_row(list(month[0] for month in MONTHS), 'low')
+	month_names = print_one_row([month[0] for month in MONTHS], 'low C')
 	
 	title_length = len(data['title'])
 	title_min_padding = 8

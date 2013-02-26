@@ -56,8 +56,8 @@ class known_values(unittest.TestCase):
 		data = climate.get_climate_data('香港')
 
 		self.assertEqual(data['title'], 'Hong Kong')
-		self.assertEqual(data['high'][0], 18.6)
-		self.assertEqual(data['record low'][11], 4.3)
+		self.assertEqual(data['high C'][0], 18.6)
+		self.assertEqual(data['record low C'][11], 4.3)
 
 	def test_weatherbox_cached_template(self):
 		""" Test a New York City-specific weatherbox use that invokes
@@ -67,8 +67,8 @@ class known_values(unittest.TestCase):
 		
 		data = climate.get_climate_data('New York City')
 
-		self.assertEqual(data['record high'][2], 30.0) # March
-		self.assertEqual(data['low'][10], 5.3) # November
+		self.assertEqual(data['record high C'][2], 30.0) # March
+		self.assertEqual(data['low C'][10], 5.3) # November
 
 	def test_known_data(self):
 		"""Test for correct retrieval of some data for some cities.
@@ -79,14 +79,14 @@ class known_values(unittest.TestCase):
 
 		known_data = {
 			'Vancouver': {
-				'record high': {6: 31.7}, #july
-				'mean': {9: 11.1}, #october
+				'record high C': {6: 31.7}, #july
+				'mean C': {9: 11.1}, #october
 				'precipitation mm': {7: 50.8} #august
 			},
 			'Seattle': {
 				# temperatures here also test conversion into C
-				'high': {3: 14.5}, #april
-				'record low': {1: -17.2, 7: 6.7}, #feb, aug
+				'high C': {3: 14.5}, #april
+				'record low C': {1: -17.2, 7: 6.7}, #feb, aug
 				'precipitation days': {10: 18.4}, #november
 				'sun': {7: 248} #august
 				# TODO: test for conversion in -> cm/mm
@@ -94,19 +94,19 @@ class known_values(unittest.TestCase):
 			'Calgary': {
 				'snow cm': {2: 21.9}, #march
 				'sun': {6: 314.9}, #july
-				'mean': {4: 9.8}, #may
-				'low': {10: -8.9}, #november
-				'record low': {1: -45} #february
+				'mean C': {4: 9.8}, #may
+				'low C': {10: -8.9}, #november
+				'record low C': {1: -45} #february
 			},
 			'Melbourne': {
-				'record high': {1: 46.4}, #february
-				'record low': {6: -2.8}, #july
+				'record high C': {1: 46.4}, #february
+				'record low C': {6: -2.8}, #july
 				'sun': {5: 108}, #june
 			},
 			'Toronto': {
-				'mean': {6: 22.2}, #july
+				'mean C': {6: 22.2}, #july
 				'snow days': {0: 12.0, 4: 0}, #january, may
-				'record low': {11: -30}, #december
+				'record low C': {11: -30}, #december
 				'rain mm': {7: 79.6}, #august
 				'sun': {4: 229.1} #may
 			},
@@ -115,8 +115,8 @@ class known_values(unittest.TestCase):
 			# elsewhere in the script
 			'Sydney': {
 				'sun': {11: 235.6, 5: 165}, #december, june
-				'record high': {0: 45.8}, #january
-				'record low': {3: 7}, #april
+				'record high C': {0: 45.8}, #january
+				'record low C': {3: 7}, #april
 				'rain days': {5: 12.5},
 				'rain mm': {8: 68.9}
 			}
