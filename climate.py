@@ -15,7 +15,8 @@ timer = []
 
 # hardcode rather than using calendar.month_abbr to avoid 
 # potential locale problems - wikipedia always uses the English abbrs
-MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 NUM_MONTHS = len(MONTHS)
 
 ROWS = ['record high C', 'high C', 'mean C', 'low C', 'record low C', 'sun', 
@@ -23,8 +24,8 @@ ROWS = ['record high C', 'high C', 'mean C', 'low C', 'record low C', 'sun',
     'rain days', 'rain mm', 'snow days', 'snow cm']
 # TODO: add support for other data of interest
 
-PRINTED_ROW_TITLES = {'record high C': 'r-high', 'high C': 'high', 'mean C': 'mean',
-    'low C': 'low', 'record low C': 'r-low', 'sun': 'sun',
+PRINTED_ROW_TITLES = {'record high C': 'r-high', 'high C': 'high',
+    'mean C': 'mean', 'low C': 'low', 'record low C': 'r-low', 'sun': 'sun',
     'precipitation days': 'prep days', 'precipitation mm': 'prep mm',
     'rain days': 'rain days', 'rain mm': 'rain mm',
     'snow days': 'snow days', 'snow cm': 'snow cm'}
@@ -43,6 +44,9 @@ UNIT_CONVERSIONS = {
     'mm': { 'cm': (lambda x: x*10) },
     'cm': { 'mm': (lambda x: x/10.0) }
     }
+
+ABSOLUTE_ROWS = ['sun', 'snow days', 'snow cm', 'rain days', 'rain mm',
+    'precipitation days', 'precipitation mm']
 
 API_URL = 'http://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&redirects=true&rvprop=content&format=json'
 
@@ -237,7 +241,8 @@ def format_data_as_text(provided_data):
     max_lengths = [0]*NUM_MONTHS
 
     for category in ROWS:
-        if len(data[category]) == NUM_MONTHS and isinstance(data[category][0], float):
+        if len(data[category]) == NUM_MONTHS \
+            and isinstance(data[category][0], float):
             for i in range(NUM_MONTHS):
                 data[category][i] = str(data[category][i])
                 max_lengths[i] = max(max_lengths[i], len(data[category][i]))
@@ -245,22 +250,29 @@ def format_data_as_text(provided_data):
             if category in row_titles:
                 max_row_title = max(max_row_title, len(row_titles[category]))
 
-    def print_one_row(row, title):
+    def format_one_row(row, title):
+        # for categories holding absolute data like prep days, snow cm, etc
+        # (rather than relative data like temperature or pressure),
+        # print '0.0' as '-' or empty
+        if title in ABSOLUTE_ROWS:
+            row = [value if value != '0.0' else '-' for value in row]
+
+        # pad row so all entries are right width for display
+        row = [row[i].rjust(max_lengths[i]) for i in range(NUM_MONTHS)]
+
         result = row_titles[title].rjust(max_row_title) + '|'
-        result = result + '|'.join(row[i].rjust(max_lengths[i]) for i in range(NUM_MONTHS)) + '|'
+        result = result + '|'.join(row) + '|'
         return result
     
     result = []
     for row_name in ROWS:
-        if row_name in row_titles and row_name in data and len(data[row_name]) == NUM_MONTHS:
-            result.append(print_one_row(data[row_name], row_name))
-
-    # TODO: for categories like prep days, snow cm, etc
-    # (e.g. not temperature), print '0.0' as '-' or empty
+        if row_name in row_titles and row_name in data \
+            and len(data[row_name]) == NUM_MONTHS:
+            result.append(format_one_row(data[row_name], row_name))
 
     # add month indicators to top line
     # to make finding e.g. September easy
-    month_names = print_one_row([month[0] for month in MONTHS], 'low C')
+    month_names = format_one_row([month[0] for month in MONTHS], 'low C')
     
     title_length = len(data['title'])
     title_min_padding = 8
