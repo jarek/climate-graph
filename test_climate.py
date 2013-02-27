@@ -70,6 +70,30 @@ class known_values(unittest.TestCase):
         self.assertEqual(data['record high C'][2], 30.0) # March
         self.assertEqual(data['low C'][10], 5.3) # November
 
+    def test_unit_conversion(self):
+        """ Test for correct conversion of units. Includes F->C and 
+        inches to mm and cm. Based on data for Seattle and NYC. """
+
+        known_data = {
+            'New York City': {
+                'precipitation mm': {5: 112, 10: 102.1}, # jun, nov
+                'snow cm': {0: 20.3, 5: 0, 11: 12.2} #jan, jun, dec
+            },
+            'Seattle': {
+                'high C': {3: 14.5}, #april
+                'record low C': {1: -17.2, 7: 6.7}, #feb, aug
+                'precipitation mm': {0: 141.2, 6: 17.8}, #jan, jul
+                'snow cm': {1: 3.6, 11: 3.8, 5: 0} # feb, dec, jun
+            }
+        }
+
+        for city,data in known_data.items():
+            actual_data = climate.get_climate_data(city)
+
+            for key,key_data in data.items():
+                for month,expected_value in key_data.items():
+                    self.assertEqual(actual_data[key][month], expected_value)
+
     def test_known_data(self):
         """Test for correct retrieval of some data for some cities.
         Test against known-correct values retrieved via browser at time
@@ -89,7 +113,6 @@ class known_values(unittest.TestCase):
                 'record low C': {1: -17.2, 7: 6.7}, #feb, aug
                 'precipitation days': {10: 18.4}, #november
                 'sun': {7: 248} #august
-                # TODO: test for conversion in -> cm/mm
             },
             'Calgary': {
                 'snow cm': {2: 21.9}, #march
@@ -127,9 +150,7 @@ class known_values(unittest.TestCase):
 
             for key,key_data in data.items():
                 for month,expected_value in key_data.items():
-                    self.assertEqual(
-                        actual_data[key][month],
-                        expected_value)
+                    self.assertEqual(actual_data[key][month], expected_value)
 
 class climate_cache_test(unittest.TestCase):
     def test_cache_create(self):

@@ -210,8 +210,8 @@ def get_climate_data(place):
             elif unit in UNIT_CONVERSIONS:
                 # try to convert units to known ones
                 for target_unit in UNIT_CONVERSIONS[unit]:
-                    # try to find a category that 
-                    #  how to convert into
+                    # try to find a category we collect that 
+                    # we know how to convert into
                     converted_category = category.replace(unit, target_unit)
                     if converted_category in result:
                         converted = UNIT_CONVERSIONS[unit][target_unit](value)
@@ -223,9 +223,6 @@ def get_climate_data(place):
                 value = daily_to_monthly(value, month)
                 result['sun'].append(value)
 
-            # TODO: add in support for other data 
-            # using mm, in, etc as needed
-        
     return result
 
 def format_data_as_text(provided_data):

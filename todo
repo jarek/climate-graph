@@ -1,0 +1,19 @@
+- when both a weatherbox and a {{Vancouver weatherbox}} template are found,
+    download both and use one with more data, or merge data from both
+
+- also, search wikisources for "{{main|Climate of ____}}" or similar. 
+    follow link, see if there's data there, merge/use as above
+
+
+astronomy stuff:
+
+- get/calculate and graph sunrise/sunset times for my curiosity.
+    from heavens-above maybe?
+    or find the relevant formulas if h-a doesn't have a convenient api
+
+- handle "% possible sunshine" as used in NYC weatherbox:
+    http://en.wikipedia.org/w/index.php?title=Template:New_York_City_weatherbox&action=edit
+    this would again need astronomical information to get sunrise/sunset hours
+    or daylight hours throughout the year
+    (averaged over month for use with the NYC data)
+
