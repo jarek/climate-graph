@@ -32,7 +32,9 @@ class Climate(callbacks.Plugin):
     def get(self, irc, msg, args, strings):
         """ <text> (including <places>, <months>, <categories>)
         Gets climate data for <places> during <months> for <categories>.
-        At least one each of place, month, and category are required. 
+        At least one each of place and month are required.
+        Category will default to average high temperature if not specified.
+        Get the list of recognized <categories> with `@climate categories`.
         Places, months, and categories can be mixed within <text> in any order.
         Unrecognized words will be silently ignored (this means you can write
         e.g. "Toronto and Sydney high for December"). """
@@ -46,6 +48,11 @@ class Climate(callbacks.Plugin):
         categories = dict((k,False) for k in climate.ROWS)
         category_aliases = dict((v,k) for k,v in \
             climate.PRINTED_ROW_TITLES.iteritems())
+
+        has_category = False
+        # has_month = False
+        # TODO: automagically pick a month with largest differences for chosen
+        # category/ies if no month is specified
 
         for param in strings:
             # classify each param
@@ -66,13 +73,20 @@ class Climate(callbacks.Plugin):
             category_param = param.lower()
             if category_param in climate.ROWS:
                 categories[category_param] = True
+                has_category = True
                 classified = True
             if category_param in category_aliases:
                 categories[category_aliases[category_param]] = True
+                has_category = True
                 classified = True
 
             if classified is False and not param.lower() in KEYWORDS:
                 cities.append(param)
+
+        if has_category is False:
+            # default to showing high temperature if no category is specified
+            categories['high C'] = True
+            has_category = True
 
         data = climate.get_comparison_data(cities, months, categories)
 
@@ -105,7 +119,38 @@ October: Toronto high 10, low 5, Melbourne high 20, low 12; April: Toronto high 
 
         irc.reply(output, prefixNick = False)
 
+    def categories(self, irc, msg, args):
+        """ <none>
+        Prints the climate categories recognized by `@climate get` """
+
+        import climate
+
+        result = 'Supported categories: '
+        cats = []
+
+        for category in climate.ROWS:
+            aliases = []
+
+            alias = climate.PRINTED_ROW_TITLES[category]
+            if not alias == category:
+                if alias.find(' ') > -1:
+                    aliases.append('"%s"' % alias)
+                else:
+                    aliases.append(alias)
+
+            if category.find(' ') > -1:
+                aliases.append('"%s"' % category)
+            else:
+                aliases.append(category)
+
+            cats.append('/'.join(aliases))
+
+        result += ', '.join(cats)
+
+        irc.reply(result, prefixNick = False)
+ 
     get = wrap(get, [many('anything')])
+    categories = wrap(categories)
 
 Class = Climate
 
