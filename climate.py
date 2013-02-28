@@ -225,6 +225,47 @@ def get_climate_data(place):
 
     return result
 
+def get_comparison_data(places, months, categories):
+    """ Return data for a number of places, categories, and months.
+     Takes a list of place names, list of 12 boolean values where True
+    means the month is requested, and a dictionary of categoryname=boolean
+    pairs (True means the category is requested) and returns the data as 
+    long as it exists. Return data format is
+    dict(month: dict(city: dict(category: data))) """
+
+    data = {}
+    for place in places:
+        place_data = get_climate_data(place)
+
+        if place_data['page_error'] is False:
+            data[place_data['title']] = place_data
+
+    result = {}
+    for month,month_include in enumerate(months):
+        if month_include:
+            month_data = {}
+
+            for place in data:
+                place_data = {}
+
+                for category,category_include in categories.items():
+                    if category_include:
+                        try:
+                            # data might not contain info for the requested
+                            # combination of place, category, and month. 
+                            # if it doesn't, just pass by silently.
+                            category_data = data[place][category][month]
+                            place_data[category] = category_data
+                        except:
+                            # fail silently
+                            pass
+
+                month_data[place] = place_data
+
+            result[month] = month_data
+
+    return result
+
 def format_data_as_text(provided_data):
     if provided_data['page_error'] is True:
         # on page error, only print error message
