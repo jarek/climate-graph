@@ -21,7 +21,8 @@ NUM_MONTHS = len(MONTHS)
 
 ROWS = ['record high C', 'high C', 'mean C', 'low C', 'record low C', 'sun', 
     'precipitation days', 'precipitation mm',
-    'rain days', 'rain mm', 'snow days', 'snow cm']
+    'rain days', 'rain mm', 'snow days', 'snow cm',
+    'location']
 # TODO: add support for other data of interest
 
 PRINTED_ROW_TITLES = {'record high C': 'r-high', 'high C': 'high',
@@ -191,8 +192,39 @@ def get_climate_data(place):
 
     weatherbox_items = weatherbox.split('|')
 
-    for line in weatherbox_items:
+    for i in range(len(weatherbox_items)):
+        line = weatherbox_items[i].strip()
         line = line.strip()
+
+        # try to parse out location data - usually specifies a neighbourhood,
+        # weather station, year range info, etc
+        if line.startswith('location'):
+            points = line.split('=', 1)
+            if len(points) == 2:
+                location = points[1].strip()
+
+                # complete the location field in case it contains an aliased
+                # wikilink, e.g. [[Vancouver International Airport|YVR]].
+                # otherwise text after the | would end up in the next 'line'
+                # and not be included in location
+
+                # this is a bit messy and would be better served by a more 
+                # comprehensive wikisource parser to find opening and closing
+                # braces, | that aren't template dividers, etc
+
+                j = i
+                while location.count('[[') > location.count(']]'):
+                    location += '|' + weatherbox_items[j+1].strip()
+                    j += 1
+
+                if '[[' in location and '|' in location and ']]' in location:
+                    location = location[0:location.find('[[')+2] \
+                        + location[location.find('|')+1:]
+
+                # finally, trim off wikilink markers, the most common 
+                # wiki syntax in this field
+                result['location'] = location.replace('[', '').replace(']', '')
+
         month = line[:3]
         if month in MONTHS:
             category,value = (x.strip() for x in line.split('='))
@@ -266,13 +298,13 @@ def get_comparison_data(places, months, categories):
 
     return result
 
-def format_data_as_text(provided_data):
+def format_data_as_text(provided_data, print_all = False):
     if provided_data['page_error'] is True:
         # on page error, only print error message
         return provided_data['title']
 
     row_titles = dict((row,PRINTED_ROW_TITLES[row]) 
-        for row in PRINTED_ROW_TITLES if row in ROWS_TO_PRINT)
+        for row in PRINTED_ROW_TITLES if row in ROWS_TO_PRINT or print_all)
     max_row_title = 0
 
     data = provided_data
@@ -329,20 +361,42 @@ def format_data_as_text(provided_data):
     if len(result) > 0:
         output = data['title'] + month_names + '\n'
         output = output + '\n'.join(result)
+
+        if print_all and len(data['location']) > 0 \
+            and data['title'] != data['location']:
+            output = output + '\n' + data['location']
     else:
         output = data['title'] + ': no information found'
 
     return output
 
 def format_timer_info():
-    return '\n'.join(l[0] + ': ' + str(l[1]) for l in timer)
+    output = ''
+
+    if len(timer) > 0:
+        output += '\n'.join(l[0] + ': ' + str(l[1]) for l in timer)
+
+    if len(cache.timer) > 0:
+        output += '\n'.join(l[0] + ': ' + str(l[1]) for l in cache.timer)
+
+    return output
 
 
 if __name__ == '__main__':
     cities = get_cities()
-    
+
+    print_all_rows = '-a' in cities
+    print_debug = '-t' in cities
+
+    if print_all_rows:
+        cities.remove('-a')
+    if print_debug:
+        cities.remove('-t')
+
     for city in cities:
         data = get_climate_data(city)
-        print format_data_as_text(data)
-        #print format_timer_info()
+        print format_data_as_text(data, print_all = print_all_rows)
+
+    if print_debug:
+        print format_timer_info()
 
