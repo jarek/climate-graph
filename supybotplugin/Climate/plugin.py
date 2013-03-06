@@ -32,7 +32,8 @@ class Climate(callbacks.Plugin):
     def get(self, irc, msg, args, strings):
         """ <text> (including <places>, <months>, <categories>)
         Gets climate data for <places> during <months> for <categories>.
-        At least one each of place and month are required.
+        Normally at least one each of place and month are required,
+        except script will pick most contrasting month if two cities are given.
         Category will default to average high temperature if not specified.
         Get the list of recognized <categories> with `@climate categories`.
         Places, months, and categories can be mixed within <text> in any order.
@@ -50,9 +51,7 @@ class Climate(callbacks.Plugin):
             climate.PRINTED_ROW_TITLES.iteritems())
 
         has_category = False
-        # has_month = False
-        # TODO: automagically pick a month with largest differences for chosen
-        # category/ies if no month is specified
+        has_month = False
 
         for param in strings:
             # classify each param
@@ -64,10 +63,12 @@ class Climate(callbacks.Plugin):
             if month_param in calendar.month_abbr:
                 month_number = list(calendar.month_abbr).index(month_param)
                 months[month_number - 1] = True
+                has_month = True
                 classified = True
             if month_param in calendar.month_name:
                 month_number = list(calendar.month_name).index(month_param)
                 months[month_number - 1] = True
+                has_month = True
                 classified = True
 
             category_param = param.lower()
@@ -88,7 +89,75 @@ class Climate(callbacks.Plugin):
             categories['high C'] = True
             has_category = True
 
-        data = climate.get_comparison_data(cities, months, categories)
+        if has_month is True:
+            data = climate.get_comparison_data(cities, months, categories)
+        elif len(cities) == 2:
+            # get data for all, and pick most interesting one automagically
+            # criterion is biggest difference between the numerical values
+            # among chosen categories for the chosen cities
+
+            # for now only two cities are supported
+            # TODO: expand to arbitrary amount - will need to round-robin
+            # the calculations or something
+
+            for i in range(len(months)):
+                months[i] = True
+
+            data = climate.get_comparison_data(cities, months, categories)
+
+            # get cities' names directly from data - they are likely 
+            # different than in request (capitalization, redirects, etc)
+            data_cities = data[data.keys()[0]].keys()
+
+            comparisons = {}
+            sums = {}
+            for i in range(len(data_cities)):
+                city = data_cities[i]
+                for category,category_include in categories.items():
+                    if not category_include:
+                        continue
+
+                    if category not in comparisons:
+                        comparisons[category] = {}
+                        sums[category] = []
+
+                    for month,month_include in enumerate(months):
+                        if not month_include:
+                            continue
+
+                        if not month in comparisons[category]:
+                            comparisons[category][month] = {}
+
+                        comparisons[category][month][city] = \
+                            data[month][city][category]
+
+                    if i > 0:
+                        for m,dummy_var in enumerate(months):
+                            # calculate difference between the two cities for
+                            # each month
+
+                            # order within sums[category] list will be created
+                            # automagically
+                            sums[category].append(abs( \
+                                comparisons[category][m][data_cities[i-1]] - \
+                                comparisons[category][m][data_cities[i]]))
+
+            max_month = -1
+            max_value = float('-inf')
+            for category in categories:
+                if category in sums:
+                    category_max = max(sums[category])
+                    category_index = sums[category].index(category_max)
+                    if category_max > max_value:
+                        max_value = category_max
+                        max_month = category_index
+
+            filtered_data = {}
+            filtered_data[max_month] = data[max_month]
+            data = filtered_data
+        else:
+            # not supported, return empty
+            data = {}
 
         # output format is roughly:
         """October: Toronto high 10, Melbourne high 20; April: Toronto high 10, Melbourne high 15
@@ -117,7 +186,11 @@ October: Toronto high 10, low 5, Melbourne high 20, low 12; April: Toronto high 
 
         output = '; '.join(output)
 
-        irc.reply(output, prefixNick = False)
+        if len(output) > 0:
+            irc.reply(output, prefixNick = False)
+        else:
+            irc.reply('No data found or invalid query. Try @help climate get.',
+                prefixNick = False)
 
     def categories(self, irc, msg, args):
         """ <none>
@@ -131,12 +204,13 @@ October: Toronto high 10, low 5, Melbourne high 20, low 12; April: Toronto high 
         for category in climate.ROWS:
             aliases = []
 
-            alias = climate.PRINTED_ROW_TITLES[category]
-            if not alias == category:
-                if alias.find(' ') > -1:
-                    aliases.append('"%s"' % alias)
-                else:
-                    aliases.append(alias)
+            if category in climate.PRINTED_ROW_TITLES:
+                alias = climate.PRINTED_ROW_TITLES[category]
+                if not alias == category:
+                    if alias.find(' ') > -1:
+                        aliases.append('"%s"' % alias)
+                    else:
+                        aliases.append(alias)
 
             if category.find(' ') > -1:
                 aliases.append('"%s"' % category)
