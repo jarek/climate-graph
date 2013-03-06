@@ -72,7 +72,7 @@ class Climate(callbacks.Plugin):
                 classified = True
 
             category_param = param.lower()
-            if category_param in climate.ROWS:
+            if category_param in categories:
                 categories[category_param] = True
                 has_category = True
                 classified = True
@@ -80,6 +80,10 @@ class Climate(callbacks.Plugin):
                 categories[category_aliases[category_param]] = True
                 has_category = True
                 classified = True
+            if category_param == 'location':
+                categories['location'] = True
+                classified = True
+                # don't treat this as has_category
 
             if classified is False and not param.lower() in KEYWORDS:
                 cities.append(param)
@@ -115,6 +119,12 @@ class Climate(callbacks.Plugin):
                 city = data_cities[i]
                 for category,category_include in categories.items():
                     if not category_include:
+                        continue
+
+                    if category == 'location':
+                        # only non-numerical 'category' so far. cannot 
+                        # be compared. detect this case more robustly if we
+                        # get more non-numerical categories
                         continue
 
                     if category not in comparisons:
@@ -153,7 +163,8 @@ class Climate(callbacks.Plugin):
                         max_month = category_index
 
             filtered_data = {}
-            filtered_data[max_month] = data[max_month]
+            if max_month > -1:
+                filtered_data[max_month] = data[max_month]
             data = filtered_data
         else:
             # not supported, return empty
@@ -175,8 +186,10 @@ October: Toronto high 10, low 5, Melbourne high 20, low 12; April: Toronto high 
 
                 category_lines = []
                 for category,category_data in city_data.items():
-                    category_lines.append(climate.PRINTED_ROW_TITLES[category]
-                        + ' ' + str(int(round(category_data, 0))))
+                    if category in climate.PRINTED_ROW_TITLES:
+                        category_lines.append(
+                            climate.PRINTED_ROW_TITLES[category]
+                            + ' ' + str(int(round(category_data, 0))))
 
                 city_line += ', '.join(category_lines)
                 city_lines.append(city_line)
@@ -186,11 +199,19 @@ October: Toronto high 10, low 5, Melbourne high 20, low 12; April: Toronto high 
 
         output = '; '.join(output)
 
+        response = ''
         if len(output) > 0:
-            irc.reply(output, prefixNick = False)
-        else:
-            irc.reply('No data found or invalid query. Try @help climate get.',
-                prefixNick = False)
+            response = output
+        elif len(cities) == 1 and 'location' in categories \
+            and categories['location'] == True:
+            data = climate.get_climate_data(cities[0])
+            if 'location' in data and len(data['location']) > 0:
+                response = data['title'] + ': ' + data['location']
+        
+        if len(response) == 0:
+            response = 'No data found or invalid query. Try @help climate get.'
+
+        irc.reply(response.encode('utf-8'), prefixNick = False)
 
     def categories(self, irc, msg, args):
         """ <none>

@@ -21,8 +21,7 @@ NUM_MONTHS = len(MONTHS)
 
 ROWS = ['record high C', 'high C', 'mean C', 'low C', 'record low C', 'sun', 
     'precipitation days', 'precipitation mm',
-    'rain days', 'rain mm', 'snow days', 'snow cm',
-    'location']
+    'rain days', 'rain mm', 'snow days', 'snow cm']
 # TODO: add support for other data of interest
 
 PRINTED_ROW_TITLES = {'record high C': 'r-high', 'high C': 'high',
