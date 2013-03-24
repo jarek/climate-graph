@@ -33,6 +33,9 @@ PRINTED_ROW_TITLES = {'record high C': 'r-high', 'high C': 'high',
 ROWS_TO_PRINT = ['record high C', 'high C', 'low C', 'record low C', 'sun']
 # , 'snow days', 'snow cm', 'precipitation days', 'precipitation mm', 'rain days', 'rain mm']
 
+MSG_LOCATION_NOT_FOUND  = ': location not found'
+MSG_NO_INFO_FOUND       = ': no information found'
+
 UNIT_CONVERSIONS = {
     'F': {
         'C': (lambda f: round((f - 32)*(5.0/9.0), 1))
@@ -67,7 +70,7 @@ def get_page_source(page_name):
     
         return page_title,page_text
     except:
-        return unicode(page_name) + ': location not found',False
+        return unicode(page_name) + MSG_LOCATION_NOT_FOUND,False
 
 def get_cities():
     cities = []
@@ -297,6 +300,20 @@ def get_comparison_data(places, months, categories):
 
     return result
 
+def has_printable_data(data):
+    # This reflects the logic used in format_data_as_text(),
+    # boiling it down to the minimum necessary to find out
+    # if something will be printed. If format_data_as_text() 
+    # is changed, this might need to be updated as well.
+
+    has_data = False
+
+    for row_name in PRINTED_ROW_TITLES:
+        if row_name in data and len(data[row_name]) == NUM_MONTHS:
+            has_data = True
+
+    return has_data
+
 def format_data_as_text(provided_data, print_all = False):
     if provided_data['page_error'] is True:
         # on page error, only print error message
@@ -365,7 +382,7 @@ def format_data_as_text(provided_data, print_all = False):
             and data['title'] != data['location']:
             output = output + '\n' + data['location']
     else:
-        output = data['title'] + ': no information found'
+        output = data['title'] + MSG_NO_INFO_FOUND
 
     return output
 
@@ -380,6 +397,111 @@ def format_timer_info():
 
     return output
 
+def parse_text_query(strings):
+    """ Takes in an array of strings and extracts recognized months, 
+    categories, and cities with climate data. Case- and order-insensitive,
+    except city names must appear together.
+    The logic used to try to stitch together multi-word city 
+    Wikipedia article names (e.g. "Hamilton, New Zealand") is essentially 
+    brute-force testing everything (so "Hamilton", "Hamilton New", 
+    "Hamilton, New", "Hamilton New Zealand", "Hamilton New Zealand" until a 
+    match is found or combinations are exhausted. Because of this, 
+    the first lookup for a query with a long or unrecognized city name
+    might take a while as we're sending a number of HTTP queries to Wikipedia.
+    If caching is active, subsequent lookups should be near-instant. 
+    However, if caching is not active, each lookup might be particularly slow 
+    as the city-name-searching algorithm sends a number of queries and 
+    the actual data retrieval makes further queries.
+    So have caching on. (Or change the code.) """
+
+    KEYWORDS = ['in', 'vs', 'versus', 'and', 'for']
+
+    def city_has_data(city):
+        data = get_climate_data(city)
+        has_data = has_printable_data(data)
+
+        return has_data
+
+    result = {'cities': [], 'months': [], 'categories': []}
+
+    result['months'] = [False]*12
+    result['categories'] = dict((k,False) for k in ROWS)
+    category_aliases = dict((v,k) for k,v in PRINTED_ROW_TITLES.iteritems())
+    cities = []
+
+    for param in strings:
+        # classify each param
+        param = param.decode('utf-8')
+
+        classified = False
+
+        # find months
+        month_param = param.title()
+        if month_param in calendar.month_abbr:
+            month_number = list(calendar.month_abbr).index(month_param)
+            result['months'][month_number - 1] = True
+            classified = True
+        if month_param in calendar.month_name:
+            month_number = list(calendar.month_name).index(month_param)
+            result['months'][month_number - 1] = True
+            classified = True
+
+        # find categories
+        category_param = param.lower()
+        if category_param in result['categories']:
+            result['categories'][category_param] = True
+            classified = True
+        if category_param in category_aliases:
+            result['categories'][category_aliases[category_param]] = True
+            classified = True
+        if category_param == 'location':
+            result['categories']['location'] = True
+            classified = True
+
+        if classified is False and not param.lower() in KEYWORDS:
+            cities.append(param)
+
+    # find cities that we can find climate data for
+    i = 0
+    while i < len(cities):
+        # first, try each string on its own
+        city = cities[i].title()
+        has_data = city_has_data(city)
+
+        j = i
+        while has_data == False and j < len(cities) - 1:
+            # Single string was not recognized.
+            # Try to build a page name we can recognize by adding in
+            # strings that follow this one in the array
+
+            # try using only spaces
+            new_city = ' '.join(cities[i:j+2]).title()
+            has_data = city_has_data(new_city)
+
+            k = j+1
+            while has_data == False and k < len(cities):
+                # if just spaces didn't result in anything recognizable,
+                # try using commas in any possible position
+                new_city = ' '.join(cities[i:j+1]) + ', ' \
+                    + ' '.join(cities[j+1:k+1])
+                new_city = new_city.title()
+                has_data = city_has_data(new_city)
+                k += 1
+
+            if has_data == True:
+                city = new_city
+                i = j + 1 # skip strings we've used this time
+            else:
+                j += 1 # look one more position further in the array
+
+        if has_data == True:
+            # we have a recognized city name, add it to the collection
+            result['cities'].append(city)
+
+        i += 1
+
+    return result
+
 
 if __name__ == '__main__':
     cities = get_cities()
@@ -392,7 +514,14 @@ if __name__ == '__main__':
     if print_debug:
         cities.remove('-t')
 
-    for city in cities:
+    parsed_cities = parse_text_query(cities)['cities']
+
+    if len(parsed_cities) > 0:
+        print_cities = parsed_cities
+    else:
+        print_cities = cities
+
+    for city in print_cities:
         data = get_climate_data(city)
         print format_data_as_text(data, print_all = print_all_rows)
 

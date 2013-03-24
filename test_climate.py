@@ -70,6 +70,67 @@ class known_values(unittest.TestCase):
         self.assertEqual(data['record high C'][2], 30.0) # March
         self.assertEqual(data['low C'][10], 5.3) # November
 
+    def test_query_string_parse(self):
+        """ Test parsing query strings, as used by the supybot plugin
+        and (for city parsing) the command-line interface. """
+
+        result = climate.parse_text_query('Toronto march'.split())
+        self.assertEqual(result['cities'], ['Toronto'])
+        self.assertEqual(result['months'][2], True)
+        self.assertEqual(result['months'][1], False)
+
+        result = climate.parse_text_query('mar high r-low'.split())
+        self.assertEqual(result['categories']['high C'], True)
+        self.assertEqual(result['categories']['record low C'], True)
+        self.assertEqual(result['months'][2], True)
+        self.assertEqual(result['cities'], [])
+
+        result = climate.parse_text_query(
+            'low seattle hamilton New Zealand portland, or mar'.split())
+        self.assertEqual(result['categories']['low C'], True)
+        self.assertEqual(result['months'][2], True)
+        self.assertEqual(result['cities'],
+            ['Seattle', 'Hamilton, New Zealand', 'Portland, Or'])
+
+        result = climate.parse_text_query(
+            ('washington dc march albuquerque new mexico ' \
+            + 'high low seattle washington').split())
+        self.assertEqual(result['categories']['high C'], True)
+        self.assertEqual(result['categories']['low C'], True)
+        self.assertEqual(result['months'][2], True)
+        self.assertEqual(result['cities'],
+            ['Washington Dc', 'Albuquerque', 'Seattle'])
+
+    def test_space_in_query_string(self):
+        """ Test that localities with spaces, possibly multiple spaces,
+        in the name are handled correctly. Examples: Washington, DC; 
+        Albuquerque, New Mexico; Hamilton, New Zealand """
+
+        result = climate.parse_text_query(
+            'Washington D.C. Toronto Elmira, Ontario Seattle'.split())
+        self.assertEqual(result['cities'],
+            ['Washington D.C.', 'Toronto', 'Seattle'])
+
+        result = climate.parse_text_query('Hamilton, New Zealand'.split())
+        self.assertEqual(result['cities'], ['Hamilton, New Zealand'])
+
+        result = climate.parse_text_query(
+            'Washington, District of Columbia Toronto Ontario'.split())
+        self.assertEqual(result['cities'],
+            ['Washington, District Of Columbia', 'Toronto'])
+
+        result = climate.parse_text_query(
+            'Washington, D.C. Toronto Hamilton New Zealand Seattle Washington'
+            .split())
+        self.assertEqual(result['cities'],
+            ['Washington, D.C.', 'Toronto', 'Hamilton, New Zealand', 'Seattle'])
+
+        result = climate.parse_text_query(
+            'Washington, D.C. Toronto Elmira, New Zealand Seattle Washington'
+            .split())
+        self.assertEqual(result['cities'],
+            ['Washington, D.C.', 'Toronto', 'Seattle'])
+
     def test_unit_conversion(self):
         """ Test for correct conversion of units. Includes F->C and 
         inches to mm and cm. Based on data for Seattle and NYC. """

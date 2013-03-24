@@ -13,8 +13,9 @@ class Climate(callbacks.Plugin):
     """ Supybot -> climate.py interface. `get` is the main function. """
 
     """ In case of problems:
-    - xltrtr missing: copy or create a link to xltrtr.py in the Transliterator 
-    directory (where plugin.py, __init.py__, config.py also live)
+    - climate missing: copy or create a link to climate.py in the Climate 
+    plugin directory (where plugin.py, __init.py__, config.py also live)
+    - cache missing: same as above, only for cache.py
 
     - unicode blargs in callbacks.py in irc.reply():
     older versions of supybot don't like unicode replies.
@@ -42,51 +43,20 @@ class Climate(callbacks.Plugin):
 
         import climate
 
-        KEYWORDS = ['in', 'vs', 'versus', 'and', 'for']
+        query = climate.parse_text_query(strings)
 
-        cities = []
-        months = [False]*12
-        categories = dict((k,False) for k in climate.ROWS)
-        category_aliases = dict((v,k) for k,v in \
-            climate.PRINTED_ROW_TITLES.iteritems())
+        cities = query['cities']
+        months = query['months']
+        categories = query['categories']
 
         has_category = False
         has_month = False
 
-        for param in strings:
-            # classify each param
-            param = param.decode('utf-8')
+        for month in months:
+            has_month = has_month or month
 
-            classified = False
-
-            month_param = param.title()
-            if month_param in calendar.month_abbr:
-                month_number = list(calendar.month_abbr).index(month_param)
-                months[month_number - 1] = True
-                has_month = True
-                classified = True
-            if month_param in calendar.month_name:
-                month_number = list(calendar.month_name).index(month_param)
-                months[month_number - 1] = True
-                has_month = True
-                classified = True
-
-            category_param = param.lower()
-            if category_param in categories:
-                categories[category_param] = True
-                has_category = True
-                classified = True
-            if category_param in category_aliases:
-                categories[category_aliases[category_param]] = True
-                has_category = True
-                classified = True
-            if category_param == 'location':
-                categories['location'] = True
-                classified = True
-                # don't treat this as has_category
-
-            if classified is False and not param.lower() in KEYWORDS:
-                cities.append(param)
+        for category in categories:
+            has_category = has_category or categories[category]
 
         if has_category is False:
             # default to showing high temperature if no category is specified
