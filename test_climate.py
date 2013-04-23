@@ -154,7 +154,33 @@ class known_values(unittest.TestCase):
             for key,key_data in data.items():
                 for month,expected_value in key_data.items():
                     self.assertEqual(actual_data[key][month], expected_value)
-
+                    
+    def test_percent_sun(self):
+        """ Test for "percent possible sunshine" conversion to sun hours.
+        This is used by New York City and Washington, D.C. weatherboxes. """
+        
+        key = 'sun'
+        
+        data = climate.get_climate_data('New York City')
+        self.assertEqual(data[key][0], round(4.9261104*31, 1))
+        self.assertEqual(data[key][1], round(5.868156653*28, 1))
+        self.assertEqual(data[key][2], round(6.815574596*31, 1))
+        self.assertEqual(data[key][3], round(7.719983411*30, 1))
+        self.assertEqual(data[key][4], round(8.817021596*31, 1))
+        self.assertEqual(data[key][5], round(9.631358414*30, 1))
+        self.assertEqual(data[key][6], round(9.605013908*31, 1))
+        self.assertEqual(data[key][7], round(8.810317932*31, 1))
+        self.assertEqual(data[key][8], round(7.727756609*30, 1))
+        self.assertEqual(data[key][9], round(6.78522459*31, 1))
+        self.assertEqual(data[key][10], round(5.173105787*30, 1))
+        self.assertEqual(data[key][11], round(4.574131285*31, 1))
+        
+        data = climate.get_climate_data('Washington, D.C.')
+        self.assertEqual(data[key][1], 150.6)
+        self.assertEqual(data[key][4], 257.1)
+        self.assertEqual(data[key][9], 204.5)
+        self.assertEqual(data[key][11], 135.7)
+        
     def test_known_data(self):
         """Test for correct retrieval of some data for some cities.
         Test against known-correct values retrieved via browser at time

@@ -2,13 +2,12 @@
 # coding=utf-8
 
 from __future__ import unicode_literals
-import cgi
+import calendar
+import simplejson as json
 import sys
 import urllib
-import simplejson as json
-import time
-import calendar
 
+import astrodata
 import cache
 
 timer = []
@@ -161,10 +160,13 @@ def get_climate_data(place):
     def parse(string):
         string = string.strip().replace(u'−', '-')
         return float(string)
+        
+    def month_number(month):
+        # convert text month to number
+        return MONTHS.index(month) + 1
 
     def daily_to_monthly(daily, month):
-        # convert text month to number
-        month = MONTHS.index(month) + 1
+        month = month_number(month)
 
         # use a non-leap year since I suspect monthly numbers are given
         # for non-leap Februarys
@@ -256,6 +258,33 @@ def get_climate_data(place):
                 # special handling for daily sun hours
                 value = daily_to_monthly(value, month)
                 result['sun'].append(value)
+                
+            elif category == 'percentsun':
+                if 'observer' not in result:
+                    # TODO: try to get location based on ll in page source
+                    # instead. Less hardcoded, and I'll probably use it 
+                    # in the future
+                    # if that fails, use the foll the following:
+                
+                    location = result['title']                
+                    # special handling for some cities
+                    if location == 'New York City':                    
+                        location = 'New York'
+                    elif location == 'Washington, D.C.':
+                        location = 'Washington'
+                        
+                    result['observer'] = astrodata.process_location(location)
+
+                try:
+                    daylight = astrodata.month_daylight(result['observer'],
+                                                        month_number(month))
+                    sun = (daylight.total_seconds()  / 3600) * (value /100)
+                    sun = round(sun, 1)
+                    result['sun'].append(sun)
+                except:
+                    # unrecognized location or other problem
+                    # fail silently
+                    pass
 
     return result
 
