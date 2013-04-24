@@ -21,7 +21,10 @@ def process_location(location):
             location.lat = str(ll[0])
             location.lon = str(ll[1])
         else:
-            location = ephem.city(str(location))
+            try:
+                location = ephem.city(str(location))
+            except:
+                location = False
             
     return location
 

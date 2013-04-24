@@ -157,9 +157,18 @@ def get_climate_data(place):
         # if we didn't find template, or we couldn't get it, fall back
         return ''
 
-    def parse(string):
-        string = string.strip().replace(u'−', '-')
-        return float(string)
+    def parse(text):
+        text = text.strip().replace(u'−', '-')
+
+        if '<!--' in text:
+            # thanks, random wikipedian who put comments in the infobox
+            start = text.find('<!--')
+            end = text.find('-->')
+
+            if end > start:
+                text = text[:start] + text[end+3:]            
+
+        return float(text)
         
     def month_number(month):
         # convert text month to number
@@ -275,16 +284,17 @@ def get_climate_data(place):
                         
                     result['observer'] = astrodata.process_location(location)
 
-                try:
-                    daylight = astrodata.month_daylight(result['observer'],
-                                                        month_number(month))
-                    sun = (daylight.total_seconds()  / 3600) * (value /100)
-                    sun = round(sun, 1)
-                    result['sun'].append(sun)
-                except:
-                    # unrecognized location or other problem
-                    # fail silently
-                    pass
+                if result['observer'] != False:
+                    try:
+                        daylight = astrodata.month_daylight(
+                            result['observer'], month_number(month))
+                        sun = (daylight.total_seconds()  / 3600) * (value /100)
+                        sun = round(sun, 1)
+                        result['sun'].append(sun)
+                    except:
+                        # unrecognized location or other problem
+                        # fail silently
+                        pass
 
     return result
 

@@ -180,6 +180,9 @@ class known_values(unittest.TestCase):
         self.assertEqual(data[key][4], 257.1)
         self.assertEqual(data[key][9], 204.5)
         self.assertEqual(data[key][11], 135.7)
+
+        # TODO: test Portland, Oregon: also uses percent sun,
+        # but isn't in cities database so I need to get latlong
         
     def test_known_data(self):
         """Test for correct retrieval of some data for some cities.
