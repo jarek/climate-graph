@@ -158,7 +158,11 @@ def get_climate_data(place):
         return ''
 
     def parse(text):
-        text = text.strip().replace(u'−', '-')
+        text = text.strip().replace('−', '-')
+        text = text.strip().replace('&minus;', '-')
+        if text == '-':
+            # used on some pages to indicate a no data condition
+            return None
 
         if '<!--' in text:
             # thanks, random wikipedian who put comments in the infobox
