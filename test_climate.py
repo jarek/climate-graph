@@ -141,7 +141,7 @@ class known_values(unittest.TestCase):
                 'snow cm': {0: 20.3, 5: 0, 11: 12.2} #jan, jun, dec
             },
             'Seattle': {
-                'high C': {3: 14.5}, #april
+                'high C': {3: 14.7}, #april
                 'record low C': {1: -17.2, 7: 6.7}, #feb, aug
                 'precipitation mm': {0: 141.2, 6: 17.8}, #jan, jul
                 'snow cm': {1: 3.6, 11: 3.8, 5: 0} # feb, dec, jun
@@ -177,6 +177,9 @@ class known_values(unittest.TestCase):
         Basically make sure future changes don't mess up known-working
         queries."""
 
+        # TODO: add a test for "Mount Fuji" to verify my workarounds in 
+        # recent commit are working consistently and are not regressed
+
         known_data = {
             'Vancouver': {
                 'record high C': {6: 31.7}, #july
@@ -185,7 +188,7 @@ class known_values(unittest.TestCase):
             },
             'Seattle': {
                 # temperatures here also test conversion into C
-                'high C': {3: 14.5}, #april
+                'high C': {3: 14.7}, #april
                 'record low C': {1: -17.2, 7: 6.7}, #feb, aug
                 'precipitation days': {10: 18.4}, #november
                 'sun': {7: 282.1} #august
