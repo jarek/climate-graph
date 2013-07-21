@@ -161,14 +161,11 @@ class known_values(unittest.TestCase):
         
         key = 'sun'
         
-        data = climate.get_climate_data('Washington, D.C.')
-        self.assertEqual(data[key][1], 150.6)
-        self.assertEqual(data[key][4], 257.1)
-        self.assertEqual(data[key][9], 204.5)
-        self.assertEqual(data[key][11], 135.7)
-
+        # Washington, D.C. weatherbox has since switched to absolute
+        # sunshine hours... can't test for now
+        
         # TODO: test Portland, Oregon: also uses percent sun,
-        # but isn't in cities database so I need to get latlong
+        # but isn't in cities database so I need to get latlong from page
         
     def test_known_data(self):
         """Test for correct retrieval of some data for some cities.
@@ -206,11 +203,11 @@ class known_values(unittest.TestCase):
                 'sun': {5: 108}, #june
             },
             'Toronto': {
-                'mean C': {6: 22.2}, #july
+                'mean C': {6: 22.3}, #july
                 'snow days': {0: 12.0, 4: 0}, #january, may
                 'record low C': {11: -30}, #december
-                'rain mm': {7: 79.6}, #august
-                'sun': {4: 229.1} #may
+                'rain mm': {7: 81.1}, #august
+                'sun': {4: 227.7} #may
             },
             # for Sydney, test conversion from daily sun hours, as
             # specified on wiki page, into monthly hours, as used
