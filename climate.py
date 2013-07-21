@@ -157,6 +157,18 @@ def get_climate_data(place):
         # if we didn't find template, or we couldn't get it, fall back
         return ''
 
+    def remove_comments(text):
+        # thanks, random wikipedians who put comments in the infobox
+        if '<!--' in text:
+            start = text.find('<!--')
+            end = text.find('-->')
+
+            if end > start:
+                text = text[:start] + text[end+3:]
+                return remove_comments(text)
+        else:
+            return text
+
     def parse(text):
         text = text.strip().replace('−', '-')
         text = text.strip().replace('&minus;', '-')
@@ -164,16 +176,8 @@ def get_climate_data(place):
             # used on some pages to indicate a no data condition
             return None
 
-        if '<!--' in text:
-            # thanks, random wikipedian who put comments in the infobox
-            start = text.find('<!--')
-            end = text.find('-->')
-
-            if end > start:
-                text = text[:start] + text[end+3:]            
-
         return float(text)
-        
+
     def month_number(month):
         # convert text month to number
         return MONTHS.index(month) + 1
@@ -207,6 +211,13 @@ def get_climate_data(place):
         # see there's a dedicated city weather template we can look at
         weatherbox = find_separate_weatherbox_template(data).strip()
 
+    # remove all comments (<!-- -->) from provided text.
+    # wikipedians have increasingly used them within templates,
+    # including spanning template sections, so we need to remove them 
+    # before doing any processing.
+    weatherbox = remove_comments(weatherbox)
+
+    # split into template sections as specified by MediaWiki
     weatherbox_items = weatherbox.split('|')
 
     for i in range(len(weatherbox_items)):

@@ -93,7 +93,6 @@ def month_daylight(location, month, exact = False):
         if adj > 0:
             days[:] = [day + adj for day in days] 
 
-        data = []
         for day_of_month in days:
             day = datetime.date(year, month, day_of_month)
             total_duration += day_duration(location, day)
