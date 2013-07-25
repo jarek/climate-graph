@@ -71,6 +71,46 @@ def get_page_source(page_name):
     except:
         return unicode(page_name) + MSG_LOCATION_NOT_FOUND,False
 
+def find_template(data, templateName):
+    if data is False:
+        return ''
+
+    if not templateName.startswith('{{'):
+        templateName = '{{' + templateName
+
+    index1 = data.find(templateName)
+
+    if index1 > -1:
+        # there's a weather box - find its extent
+
+        index2 = index1
+        loop_end = False
+
+        while not loop_end:
+            # count template open and close tags to grab
+            # full extent of weatherbox template.
+            # avoids incomplete data due to cite or convert
+            # templates.
+            prev_index2 = index2
+
+            index2 = data.find('}}', index2)+2
+            open_count = data[index1:index2].count('{{') 
+            clos_count = data[index1:index2].count('}}')
+
+            # to end loop, check for two things:
+            # - open count = close count: we found the 
+            # complete template, can stop looking
+            # - previous index is same as current index:
+            # loop is not advancing, might be a malformed
+            # page, avoid endless loop by breaking
+
+            loop_end = (open_count == clos_count) and \
+                (index2 != prev_index2) # do..while
+
+        return data[index1:index2]
+    else:
+        return ''
+
 def get_cities():
     cities = []
 
@@ -90,44 +130,103 @@ def get_cities():
 
     return cities
 
+def remove_comments(text):
+    # thanks, random wikipedians who put comments in the infobox
+    if '<!--' in text:
+        # first the first pair of <!-- comment tags -->
+        start = text.find('<!--')
+        end = text.find('-->')
+
+        if end > start:
+            # remove the comment between tags from text
+            text = text[:start] + text[end+3:]
+
+            # repeat until there are no comments left
+            return remove_comments(text)
+    else:
+        return text
+
+def get_coordinates(place):
+    # TODO: might be nice to generalize and factor out infobox parsing
+    # from here and get_climate_data().
+    # Might need a bit of clean-up/code refresh, particularly in the latter,
+    # but get_page_source, find_template, remove_comments, split(),
+    # various trim()s should all be common to the two.
+
+    result = {'page_error': False}
+    result['title'],data = get_page_source(place)
+
+    infobox = find_template(data, 'Infobox settlement').strip()
+
+    # remove all comments (<!-- -->) from provided text.
+    # wikipedians have increasingly used them within templates,
+    # including spanning template sections, so we need to remove them 
+    # before doing any processing.
+    infobox = remove_comments(infobox)
+
+    # split into template sections as specified by MediaWiki
+    infobox_items = infobox.split('|')
+
+    data = {}
+    for i in range(len(infobox_items)):
+        line = infobox_items[i].strip()
+        line = line.strip()
+
+        line_data = line.split('=')
+        key = line_data[0].strip()
+
+        if key.startswith('lat') or key.startswith('long') \
+            or key.startswith('elevation_m'):
+
+            value = ''.join(line_data[1:]).strip()
+
+            if value != '':
+                data[key] = value
+
+    lat = 0;
+    if 'latd' in data:
+        lat += float(data['latd'])
+    if 'latm' in data:
+        lat += float(data['latm']) / 60
+    if 'lats' in data:
+        lat += float(data['lats']) / (60*60)
+    if 'latNS' in data and data['latNS'].lower() == 's':
+        lat = lat * -1
+    lat = round(lat, 4)
+
+    lng = 0;
+    if 'longd' in data:
+        lng += float(data['longd'])
+    if 'longm' in data:
+        lng += float(data['longm']) / 60
+    if 'longs' in data:
+        lng += float(data['longs']) / (60*60)
+    if 'longEW' in data and data['longEW'].lower() == 'w':
+        lng = lng * -1
+    lng = round(lng, 4)
+
+    result = { 'lat': lat, 'lng': lng }
+
+    try:
+        # on the other hand, elevation must be specified as a float
+        if 'elevation_m' in data:
+            result['elevation'] = float(data['elevation_m'])
+
+        # also try to use max elevation and min elevation, in that order
+        # TODO: might want to also try convert elevation_f
+        if not 'elevation' in result and 'elevation_max_m' in data:
+            result['elevation'] = float(data['elevation_max_m'])
+
+        if not 'elevation' in result and 'elevation_min_m' in data:
+            result['elevation'] = float(data['elevation_min_m'])
+    except:
+        # ignore: might be in a format float can't handle
+        # (e.g. Whitehorse uses "670&ndash;1702")
+        pass
+
+    return result
+
 def get_climate_data(place):
-    def find_weatherbox_template(data):
-        if data is False:
-            return ''
-
-        index1 = data.find('{{Weather box')
-
-        if index1 > -1:
-            # there's a weather box - find its extent
-
-            index2 = index1
-            loop_end = False
-
-            while not loop_end:
-                # count template open and close tags to grab
-                # full extent of weatherbox template.
-                # avoids incomplete data due to cite or convert
-                # templates.
-                prev_index2 = index2
-
-                index2 = data.find('}}', index2)+2
-                open_count = data[index1:index2].count('{{') 
-                clos_count = data[index1:index2].count('}}')
-
-                # to end loop, check for two things:
-                # - open count = close count: we found the 
-                # complete template, can stop looking
-                # - previous index is same as current index:
-                # loop is not advancing, might be a malformed
-                # page, avoid endless loop by breaking
-
-                loop_end = (open_count == clos_count) and \
-                    (index2 != prev_index2) # do..while
-
-            return data[index1:index2]
-        else:
-            return ''
-
     def find_separate_weatherbox_template(data):
         if data is False:
             return ''
@@ -152,22 +251,10 @@ def get_climate_data(place):
 
             weatherbox_title,data = get_page_source(template_name)
             if data is not False:
-                return find_weatherbox_template(data)
+                return find_template(data, 'Weather box')
 
         # if we didn't find template, or we couldn't get it, fall back
         return ''
-
-    def remove_comments(text):
-        # thanks, random wikipedians who put comments in the infobox
-        if '<!--' in text:
-            start = text.find('<!--')
-            end = text.find('-->')
-
-            if end > start:
-                text = text[:start] + text[end+3:]
-                return remove_comments(text)
-        else:
-            return text
 
     def parse(text):
         text = text.strip().replace('−', '-')
@@ -198,7 +285,7 @@ def get_climate_data(place):
 
     result['title'],data = get_page_source(place)
 
-    weatherbox = find_weatherbox_template(data).strip()
+    weatherbox = find_template(data, 'Weather box').strip()
 
     if data is False:
         # indicates a problem getting data - signal it so output
@@ -285,31 +372,18 @@ def get_climate_data(place):
                 
             elif category == 'percentsun':
                 if 'observer' not in result:
-                    # TODO: try to get location based on ll in page source
-                    # instead. Less hardcoded, and I'll probably use it 
-                    # in the future
-                    # if that fails, use the foll the following:
-                
-                    location = result['title']                
-                    # special handling for some cities
-                    if location == 'New York City':                    
-                        location = 'New York'
-                    elif location == 'Washington, D.C.':
-                        location = 'Washington'
-                        
+                    location = result['title']
+                   
+                    # will try to get lat,lng from wikipedia page if location
+                    # is not recognized by pyephem directly    
                     result['observer'] = astrodata.process_location(location)
 
                 if result['observer'] != False:
-                    try:
-                        daylight = astrodata.month_daylight(
-                            result['observer'], month_number(month))
-                        sun = (daylight.total_seconds()  / 3600) * (value /100)
-                        sun = round(sun, 1)
-                        result['sun'].append(sun)
-                    except:
-                        # unrecognized location or other problem
-                        # fail silently
-                        pass
+                    daylight = astrodata.month_daylight(
+                        result['observer'], month_number(month))
+                    sun = (daylight.total_seconds()  / 3600) * (value /100)
+                    sun = round(sun, 1)
+                    result['sun'].append(sun)
 
     return result
 

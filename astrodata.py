@@ -24,8 +24,30 @@ def process_location(location):
             try:
                 location = ephem.city(unicode(location))
             except:
-                location = False
-            
+                try:
+                    location = get_location_from_wikipedia(unicode(location))
+                except:
+                    location = False
+
+    return location
+
+def get_location_from_wikipedia(name):
+    data = climate.get_coordinates(name)
+
+    location = ephem.Observer()
+    # pyephem is a little weird, only works right when these are strings
+    location.lat = str(data['lat'])
+    location.lon = str(data['lng'])
+
+    try:
+        # on the other hand, elevation must be specified as a float
+        location.elevation = float(data['elevation'])
+    except:
+        # ignore, might not have been specified, 
+        # or might be in a format float or pyephem can't handle
+        # e.g. Whitehorse uses "670&ndash;1702"
+        pass
+
     return location
 
 def day_duration(location, date = False):
@@ -109,7 +131,7 @@ if __name__ == '__main__':
     cities = climate.get_cities()
     
     for city in cities:
-        v = ephem.city(unicode(city))
+        v = process_location(unicode(city))
         print 'day lengths in %s on first day of month, in hours:' % city
         
         for i in range(12):

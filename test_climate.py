@@ -157,16 +157,36 @@ class known_values(unittest.TestCase):
                     
     def test_percent_sun(self):
         """ Test for "percent possible sunshine" conversion to sun hours.
-        This is used by Washington, D.C. weatherbox. """
+        This is used by Portland, Oregon weatherbox. """
         
         key = 'sun'
         
-        # Washington, D.C. weatherbox has since switched to absolute
-        # sunshine hours... can't test for now
+        data = climate.get_climate_data('Portland, Oregon')
+        self.assertEqual(data[key][3], 202.5) #april
+        self.assertEqual(data[key][6], 312.9) #july
+        self.assertEqual(data[key][11], 62.7) #december
         
-        # TODO: test Portland, Oregon: also uses percent sun,
-        # but isn't in cities database so I need to get latlong from page
-        
+    def test_latlng_known_data(self):
+        """ Test getting latitude, longitudes, and elevations of some
+        test cities. Parses their Wikipedia page to get this information.        
+        This is also tested implicitly by test_percent_sun 
+        for Portland, Oregon, since we need Wikipedia latlng 
+        to compute that particular data set."""
+
+        known_data = {
+            'Toronto': {'lat': 43.7, 'lng': -79.4, 'elevation': 76},
+            'Auckland': {'lat': -36.8404, 'lng': 174.7399, 'elevation': 196},
+            'Akureyri': {'lat': 65.6833, 'lng': -18.1},
+            'Alert, Nunavut': {'lat': 82.5014, 'lng': -62.3389},
+            'Buenos Aires': {'lat': -34.6033, 'lng': -58.3817, 'elevation': 25}
+        }
+
+        for city,data in known_data.items():
+            actual_data = climate.get_coordinates(city)
+
+            for key,expected_value in data.items():
+                self.assertEqual(actual_data[key], expected_value)
+
     def test_known_data(self):
         """Test for correct retrieval of some data for some cities.
         Test against known-correct values retrieved via browser at time
@@ -174,14 +194,16 @@ class known_values(unittest.TestCase):
         Basically make sure future changes don't mess up known-working
         queries."""
 
-        # TODO: add a test for "Mount Fuji" to verify my workarounds in 
-        # recent commit are working consistently and are not regressed
-
         known_data = {
             'Vancouver': {
                 'record high C': {6: 31.7}, #july
                 'mean C': {9: 11.1}, #october
                 'precipitation mm': {7: 50.8} #august
+            },
+            'Mount Fuji': {
+                # tests cleaning of "&minus;10.9"-like values
+                'high C': {2: -10.9}, #march
+                'record low C': {0: -37.3} #january
             },
             'Seattle': {
                 # temperatures here also test conversion into C
