@@ -103,7 +103,7 @@ def month_daylight(location, month, exact = False):
         # for different months if I can find a consistent pattern
         # of which months are most frequently off
         
-        skip_days = int(round(month_days / (5 * location.lat)))
+        skip_days = int(round(month_days / (5 * abs(location.lat))))
         if skip_days > 13:
             skip_days = 13 # cap at 13 so that we always get at least 3 days
 
