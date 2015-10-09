@@ -154,9 +154,9 @@ def get_coordinates(place):
     # various trim()s should all be common to the two.
 
     result = {'page_error': False}
-    result['title'],data = get_page_source(place)
+    result['title'],page_data = get_page_source(place)
 
-    infobox = find_template(data, 'Infobox settlement').strip()
+    infobox = find_template(page_data, 'Infobox settlement').strip()
 
     # remove all comments (<!-- -->) from provided text.
     # wikipedians have increasingly used them within templates,
@@ -192,7 +192,6 @@ def get_coordinates(place):
         lat += float(data['lats']) / (60*60)
     if 'latNS' in data and data['latNS'].lower() == 's':
         lat = lat * -1
-    lat = round(lat, 4)
 
     lng = 0;
     if 'longd' in data:
@@ -203,6 +202,58 @@ def get_coordinates(place):
         lng += float(data['longs']) / (60*60)
     if 'longEW' in data and data['longEW'].lower() == 'w':
         lng = lng * -1
+
+    if lat == lng == 0:
+        # TODO: this would be better detected earlier, but for sake of
+        # keeping changes small I will add it here to be refactored later
+
+        # no data found, look for one other template.
+        # annoyingly there are four possible formats:
+        # https://en.wikipedia.org/wiki/Template:Coord#Usage
+
+        def index_or_minus_one(list, haystack):
+            try:
+                return list.index(haystack)
+            except ValueError:
+                return -1
+
+        coords = find_template(page_data, 'Coord').strip()
+        coords = coords.split('|')
+
+        if len(coords):
+            end_of_latitude = max(index_or_minus_one(coords, 'N'), index_or_minus_one(coords, 'S'))
+            end_of_longitude = max(index_or_minus_one(coords, 'E'), index_or_minus_one(coords, 'W'))
+
+            if end_of_latitude == end_of_longitude == -1:
+                # in this format, the values are verbatim early on
+                lat = float(coords[1])
+                lng = float(coords[2])
+            else:
+                scan_index = 1
+                lat_depth = 0
+                lng_depth = 0
+
+                while scan_index < end_of_latitude:
+                    lat += float(coords[scan_index]) / 60**lat_depth
+
+                    lat_depth += 1
+                    scan_index += 1
+
+                if coords[end_of_latitude] == 'S':
+                    lat *= -1
+
+                scan_index += 1  # skip latitude direction sign
+
+                while scan_index < end_of_longitude:
+                    lng += float(coords[scan_index]) / 60**lng_depth
+
+                    lng_depth += 1
+                    scan_index += 1
+
+                if coords[end_of_longitude] == 'W':
+                    lng *= -1
+
+    lat = round(lat, 4)
     lng = round(lng, 4)
 
     result = { 'lat': lat, 'lng': lng }
