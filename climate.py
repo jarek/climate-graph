@@ -242,7 +242,8 @@ def get_climate_data(place):
         # common this is, but NYC is pretty major and handling it
         # is easy, so might as well.
         index2 = max(data.find('weatherbox}}'),
-            data.find('weatherbox/cached}}'))
+            data.find('weatherbox/cached}}'),
+            data.find('weatherbox|collapsed=Y}}'))
 
         if index2 > -1:
             # there is separate template - get it and process it
@@ -262,6 +263,9 @@ def get_climate_data(place):
         if text == '-':
             # used on some pages to indicate a no data condition
             return None
+        if text == 'trace':
+            # used on some pages to indicate essentially 0, I guess
+            return 0
 
         return float(text)
 

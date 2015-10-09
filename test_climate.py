@@ -138,13 +138,13 @@ class known_values(unittest.TestCase):
         known_data = {
             'New York City': {
                 'precipitation mm': {5: 112, 10: 102.1}, # jun, nov
-                'snow cm': {0: 20.3, 5: 0, 11: 12.2} #jan, jun, dec
+                'snow cm': {0: 17.8, 5: 0, 11: 12.2} #jan, jun, dec
             },
             'Seattle': {
                 'high C': {3: 14.7}, #april
                 'record low C': {1: -17.2, 7: 6.7}, #feb, aug
-                'precipitation mm': {0: 141.2, 6: 17.8}, #jan, jul
-                'snow cm': {1: 3.6, 11: 3.8, 5: 0} # feb, dec, jun
+                'precipitation mm': {0: 141.5, 6: 17.8}, #jan, jul
+                'snow cm': {1: 4.3, 11: 4.3, 5: 0} # feb, dec, jun
             }
         }
 
@@ -175,7 +175,7 @@ class known_values(unittest.TestCase):
 
         known_data = {
             'Toronto': {'lat': 43.7, 'lng': -79.4, 'elevation': 76},
-            'Auckland': {'lat': -36.8404, 'lng': 174.7399, 'elevation': 196},
+            'Auckland': {'lat': -36.8406, 'lng': 174.74, 'elevation': 196},
             'Akureyri': {'lat': 65.6833, 'lng': -18.1},
             'Alert, Nunavut': {'lat': 82.5014, 'lng': -62.3389},
             'Buenos Aires': {'lat': -34.6033, 'lng': -58.3817, 'elevation': 25}
