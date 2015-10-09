@@ -210,7 +210,7 @@ class known_values(unittest.TestCase):
                 'high C': {3: 14.7}, #april
                 'record low C': {1: -17.2, 7: 6.7}, #feb, aug
                 'precipitation days': {10: 18.4}, #november
-                'sun': {7: 282.1} #august
+                'sun': {7: 281.4} #august
             },
             'Calgary': {
                 'snow cm': {2: 21.9}, #march

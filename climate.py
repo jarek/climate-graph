@@ -424,8 +424,13 @@ def get_climate_data(place):
                 # special handling for daily sun hours
                 value = daily_to_monthly(value, month)
                 result['sun'].append(value)
-                
-            elif category == 'percentsun':
+
+            # Process percentsun if present and we haven't found any other sun data.
+            # Assume specific hour count is more precise than "% sunshine", so only
+            # use percentsun if other data is not more available.
+            # TODO: if percentsun is ahead of sun in the template, this
+            # precautionary condition will still fail
+            elif category == 'percentsun' and len(result['sun']) == 0:
                 if 'observer' not in result:
                     location = result['title']
                    
