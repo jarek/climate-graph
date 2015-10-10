@@ -3,8 +3,9 @@
 
 from __future__ import unicode_literals
 import calendar
-import simplejson as json
+import json
 import sys
+from collections import OrderedDict
 import urllib
 
 import astrodata
@@ -146,17 +147,10 @@ def remove_comments(text):
     else:
         return text
 
-def get_coordinates(place):
-    # TODO: might be nice to generalize and factor out infobox parsing
-    # from here and get_climate_data().
-    # Might need a bit of clean-up/code refresh, particularly in the latter,
-    # but get_page_source, find_template, remove_comments, split(),
-    # various trim()s should all be common to the two.
-
-    result = {'page_error': False}
-    result['title'],page_data = get_page_source(place)
-
-    infobox = find_template(page_data, 'Infobox settlement').strip()
+def parse_infobox(infobox):
+    if infobox == '':
+        # if not found, return early
+        return {}
 
     # remove all comments (<!-- -->) from provided text.
     # wikipedians have increasingly used them within templates,
@@ -164,56 +158,82 @@ def get_coordinates(place):
     # before doing any processing.
     infobox = remove_comments(infobox)
 
+    # Search through text to find things formatted like
+    # [[Vancouver International Airport|YVR]]
+    # as this would break splitting the template on "|".
+    # Cut out the "|YVR" part to simplify.
+
+    index = infobox.find('[[')
+    while index > -1:
+        index_of_end_of_link = infobox.find(']]', index)
+        index_of_pipe = infobox.find('|', index)
+
+        if -1 < index_of_pipe < index_of_end_of_link:
+            infobox = infobox[:index_of_pipe] + infobox[index_of_end_of_link:]
+
+        index = infobox.find('[[', index + 2)
+
     # split into template sections as specified by MediaWiki
     infobox_items = infobox.split('|')
 
-    data = {}
-    for i in range(len(infobox_items)):
-        line = infobox_items[i].strip()
-        line = line.strip()
+    def process(item):
+        line_data = item.split('=')
 
-        line_data = line.split('=')
         key = line_data[0].strip()
+        value = ''.join(line_data[1:]).strip()
 
-        if key.startswith('lat') or key.startswith('long') \
-            or key.startswith('elevation_m'):
+        return key, value
 
-            value = ''.join(line_data[1:]).strip()
+    # Currently infobox_data has to be an OrderedDict because older code
+    # expects to iterate through the infobox in year order. This worked
+    # previously because all infoboxes I've worked with had data specified in
+    # year order.
+    # TODO: we should move code using this function to explicitly re-order data
+    # it processes so that it is January to December, rather than depending
+    # on Wikipedia wikisource to be in the correct order.
+    infobox_data = OrderedDict(process(item) for item in infobox_items)
+    infobox_data = OrderedDict((key, value) for (key, value) in infobox_data.items()
+                               if value != '')
 
-            if value != '':
-                data[key] = value
+    return infobox_data
 
-    lat = 0;
-    if 'latd' in data:
-        lat += float(data['latd'])
-    if 'latm' in data:
-        lat += float(data['latm']) / 60
-    if 'lats' in data:
-        lat += float(data['lats']) / (60*60)
-    if 'latNS' in data and data['latNS'].lower() == 's':
-        lat = lat * -1
+def get_coordinates(place):
+    result = {'page_error': False}
+    result['title'],page_data = get_page_source(place)
 
-    lng = 0;
-    if 'longd' in data:
-        lng += float(data['longd'])
-    if 'longm' in data:
-        lng += float(data['longm']) / 60
-    if 'longs' in data:
-        lng += float(data['longs']) / (60*60)
-    if 'longEW' in data and data['longEW'].lower() == 'w':
-        lng = lng * -1
+    infobox = find_template(page_data, 'Infobox settlement')
+    data = parse_infobox(infobox)
 
-    if lat == lng == 0:
-        # TODO: this would be better detected earlier, but for sake of
-        # keeping changes small I will add it here to be refactored later
+    lat = 0
+    lng = 0
 
+    if 'latd' in data and 'longd' in data:
+        # Infobox settlement has lat/long data, so parse that
+
+        lat = float(data['latd'])
+        if 'latm' in data:
+            lat += float(data['latm']) / 60
+        if 'lats' in data:
+            lat += float(data['lats']) / 3600
+        if 'latNS' in data and data['latNS'].lower() == 's':
+            lat *= -1
+
+        lng = float(data['longd'])
+        if 'longm' in data:
+            lng += float(data['longm']) / 60
+        if 'longs' in data:
+            lng += float(data['longs']) / 3600
+        if 'longEW' in data and data['longEW'].lower() == 'w':
+            lng *= -1
+
+    elif lat == lng == 0:
         # no data found, look for one other template.
         # annoyingly there are four possible formats:
         # https://en.wikipedia.org/wiki/Template:Coord#Usage
 
-        def index_or_minus_one(list, haystack):
+        def index_or_minus_one(haystack, needle):
             try:
-                return list.index(haystack)
+                return haystack.index(needle)
             except ValueError:
                 return -1
 
@@ -340,66 +360,35 @@ def get_climate_data(place):
 
     result['title'],data = get_page_source(place)
 
-    weatherbox = find_template(data, 'Weather box').strip()
-
     if data is False:
         # indicates a problem getting data - signal it so output
         # can be formatted accordingly
         result['page_error'] = True
         return result
 
-    if len(weatherbox) == 0:
+    weatherbox = find_template(data, 'Weather box')
+    weatherbox_info = parse_infobox(weatherbox)
+
+    if len(weatherbox_info) == 0:
         # weatherbox not found directly on page
         # see there's a dedicated city weather template we can look at
         weatherbox = find_separate_weatherbox_template(data).strip()
+        weatherbox_info = parse_infobox(weatherbox)
 
-    # remove all comments (<!-- -->) from provided text.
-    # wikipedians have increasingly used them within templates,
-    # including spanning template sections, so we need to remove them 
-    # before doing any processing.
-    weatherbox = remove_comments(weatherbox)
-
-    # split into template sections as specified by MediaWiki
-    weatherbox_items = weatherbox.split('|')
-
-    for i in range(len(weatherbox_items)):
-        line = weatherbox_items[i].strip()
-        line = line.strip()
+    for key in weatherbox_info:
+        value = weatherbox_info[key]
 
         # try to parse out location data - usually specifies a neighbourhood,
         # weather station, year range info, etc
-        if line.startswith('location'):
-            points = line.split('=', 1)
-            if len(points) == 2:
-                location = points[1].strip()
+        if key == 'location':
+            # trim off wikilink markers, the most common
+            # wiki syntax in this field
+            result['location'] = value.replace('[', '').replace(']', '')
 
-                # complete the location field in case it contains an aliased
-                # wikilink, e.g. [[Vancouver International Airport|YVR]].
-                # otherwise text after the | would end up in the next 'line'
-                # and not be included in location
-
-                # this is a bit messy and would be better served by a more 
-                # comprehensive wikisource parser to find opening and closing
-                # braces, | that aren't template dividers, etc
-
-                j = i
-                while location.count('[[') > location.count(']]'):
-                    location += '|' + weatherbox_items[j+1].strip()
-                    j += 1
-
-                if '[[' in location and '|' in location and ']]' in location:
-                    location = location[0:location.find('[[')+2] \
-                        + location[location.find('|')+1:]
-
-                # finally, trim off wikilink markers, the most common 
-                # wiki syntax in this field
-                result['location'] = location.replace('[', '').replace(']', '')
-
-        month = line[:3]
+        month = key[:3]
         if month in MONTHS:
-            category,value = (x.strip() for x in line.split('='))
-            category = category[3:].strip() # take out the month
-            value = parse(value) # parse as number
+            category = key[3:].strip()  # take out the month to get data category
+            value = parse(value)  # parse value as number
 
             # last token of category name is sometimes the unit
             # (C, F, mm, inch, etc)
